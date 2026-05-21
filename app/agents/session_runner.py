@@ -11,6 +11,7 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
 
 from app.agents.core_rag import create_core_rag_agent
+from app.agents.external_knowledge import create_external_knowledge_agent
 from app.config import Settings
 from app.knowledge.store import KnowledgeCorpus
 
@@ -73,3 +74,40 @@ def run_core_rag_turn_sync(
     import asyncio
 
     return asyncio.run(run_core_rag_turn(**kwargs))
+
+
+async def run_phase2_external_turn(
+    *,
+    settings: Settings,
+    corpus: KnowledgeCorpus,
+    question: str,
+    user_id: str = "local-user",
+    session_id: str = "phase2-session",
+    app_label: str = "phase2_external",
+) -> tuple[str, list[Event]]:
+    """Phase-2 conversational turn — private corpus (optional) plus Google Search grounding."""
+    agent = create_external_knowledge_agent(settings, corpus)
+    app = App(name=app_label, root_agent=agent)
+    runner = Runner(
+        app=app,
+        session_service=InMemorySessionService(),
+        auto_create_session=True,
+    )
+
+    events: list[Event] = []
+    async for event in runner.run_async(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=_user_turn(question),
+        yield_user_message=False,
+    ):
+        events.append(event)
+
+    return concatenate_agent_text(events), events
+
+
+def run_phase2_external_turn_sync(**kwargs: Any) -> tuple[str, list[Event]]:
+    """Blocking facade for notebooks / Streamlit."""
+    import asyncio
+
+    return asyncio.run(run_phase2_external_turn(**kwargs))

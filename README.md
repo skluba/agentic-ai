@@ -35,7 +35,7 @@ agentic-ai-ui                   # launches Streamlit on :8501
 docker compose up --build rag-ui        # exposes http://localhost:8501
 ```
 
-The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (disable **offline embeddings** in the Phase 1 tab). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
+The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (toggle **offline embeddings** in Streamlit around the shared corpus). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
 
 Self-hosted Langfuse uses the official Compose blueprint (PostgreSQL + Redis + ClickHouse + MinIO)—see **[docs/langfuse-self-hosted.md](docs/langfuse-self-hosted.md)** and the upstream **[Langfuse Compose guide](https://langfuse.com/self-hosting/deployment/docker-compose)**.
 
@@ -65,7 +65,17 @@ End-to-end **Plan → Execute → Synthesize** flow over a **private knowledge b
 2. **Execute** — the ADK agent `core_rag` (`app/agents/core_rag.py`) must call **`search_private_knowledge`** (`app/tools/document_search_tool.py`) before answering.
 3. **Synthesize** — the model summarizes grounded snippets into a concise reply.
 
-Try it in Streamlit (**Phase 1 RAG** tab): ingest sample notes, toggle **offline embeddings** for CI/local runs without Vertex embeddings, then ask a question — use **`GEMINI_API_KEY`** (or **`GOOGLE_API_KEY`**) for the AI Studio Gemini path or Vertex ADC **`gcloud auth application-default login`** for enterprise routing. Programmatic helper: `run_core_rag_turn_sync` / `run_core_rag_turn` in `app/agents/session_runner.py`.
+Try it in Streamlit (**Phase 1 RAG** tab): ingest sample notes in the **shared corpus** strip, then switch to the Phase 1 tab — use **`GEMINI_API_KEY`** (or **`GOOGLE_API_KEY`**) for the AI Studio Gemini path or Vertex ADC **`gcloud auth application-default login`** for enterprise routing. Programmatic helper: `run_core_rag_turn_sync` / `run_core_rag_turn` in `app/agents/session_runner.py`.
+
+### Phase 2: External knowledge (Hybrid)
+
+Adds **hosted Google Search** (Gemini grounding) beside optional private snippets:
+
+1. **Planner-aware execution** (`app/agents/external_knowledge.py`) — system instructions route internal-looking questions to **`search_private_knowledge`**, outward/time-sensitive probes to Gemini’s **`GoogleSearchTool`** (with ADK **`bypass_multi_tools_limit`** so multiple tools coexist).
+2. **Synthesis** — require explicit provenance labels **`PRIVATE_KB`** vs **`WEB`**, reconcile disagreements briefly, then unify the stance.
+3. **Streamlit — Phase 2 tab** — same shared corpus strip as Phase 1 (uploads optional; grounding still runs).
+
+Use **`run_phase2_external_turn_sync`** / **`run_phase2_external_turn`** from **`app/agents/session_runner.py`**.
 
 ---
 
@@ -88,9 +98,11 @@ Optional: SonarLint / IDE connected mode uses [`.sonarlint/connectedMode.json`](
 ```
 app/config.py               # pydantic-settings for Vertex + Langfuse + embeddings
 app/knowledge/              # Phase 1 chunk → embed → FAISS corpus + search_chunks
-app/agents/core_rag.py      # Plan/Execute/Synthesize ADK agent + retrieval tool
+app/agents/core_rag.py      # Phase 1 Plan/Execute/Synthesize + document tool
+app/agents/external_knowledge.py # Phase 2 hybrid planner + corpus + Google Search grounding
 app/agents/session_runner.py
 app/tools/document_search_tool.py
+app/tools/google_search_tool.py
 app/rag/faiss_store.py      # deterministic in-memory retrieval slice (lab demo)
 app/rag/lab_demo.py         # hierarchical @observe (chain + retriever spans)
 app/observability/          # Langfuse helpers + flush for scripts / Streamlit
