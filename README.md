@@ -35,6 +35,8 @@ agentic-ai-ui                   # launches Streamlit on :8501
 docker compose up --build rag-ui        # exposes http://localhost:8501
 ```
 
+The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (disable **offline embeddings** in the Phase 1 tab). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
+
 Self-hosted Langfuse uses the official Compose blueprint (PostgreSQL + Redis + ClickHouse + MinIO)—see **[docs/langfuse-self-hosted.md](docs/langfuse-self-hosted.md)** and the upstream **[Langfuse Compose guide](https://langfuse.com/self-hosting/deployment/docker-compose)**.
 
 ## GCP & Langfuse vars
@@ -45,6 +47,9 @@ Populate `.env` (values are illustrative):
 GOOGLE_CLOUD_PROJECT=gd-gcp-gridu-genai
 VERTEX_LOCATION=europe-west4
 GEMINI_MODEL=gemini-2.0-flash
+# Optional Gemini Developer API (AI Studio — used by ADK chat when set)
+GEMINI_API_KEY=
+
 LANGFUSE_HOST=http://localhost:3000       # omit to disable instrumentation
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
@@ -60,7 +65,7 @@ End-to-end **Plan → Execute → Synthesize** flow over a **private knowledge b
 2. **Execute** — the ADK agent `core_rag` (`app/agents/core_rag.py`) must call **`search_private_knowledge`** (`app/tools/document_search_tool.py`) before answering.
 3. **Synthesize** — the model summarizes grounded snippets into a concise reply.
 
-Try it in Streamlit (**Phase 1 RAG** tab): ingest sample notes, toggle **offline embeddings** for CI/local runs without Vertex, or use Vertex with Application Default Credentials. Programmatic helper: `run_core_rag_turn_sync` / `run_core_rag_turn` in `app/agents/session_runner.py`.
+Try it in Streamlit (**Phase 1 RAG** tab): ingest sample notes, toggle **offline embeddings** for CI/local runs without Vertex embeddings, then ask a question — use **`GEMINI_API_KEY`** (or **`GOOGLE_API_KEY`**) for the AI Studio Gemini path or Vertex ADC **`gcloud auth application-default login`** for enterprise routing. Programmatic helper: `run_core_rag_turn_sync` / `run_core_rag_turn` in `app/agents/session_runner.py`.
 
 ---
 

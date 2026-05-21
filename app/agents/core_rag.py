@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from google.adk import Agent
 
-from app.config import Settings
+from app.config import Settings, configure_google_genai_api_key_environment
 from app.knowledge.store import KnowledgeCorpus
 from app.tools.document_search_tool import make_document_search_tool
 
@@ -29,6 +29,7 @@ def create_core_rag_agent(
     prompt: str | None = None,
 ) -> Agent:
     """Single ADK Agent with corpus-bound document search tooling."""
+    configure_google_genai_api_key_environment(settings)
     if corpus.chunk_count == 0:
         msg = "Cannot create core rag agent until the corpus ingests at least one chunk."
         raise ValueError(msg)

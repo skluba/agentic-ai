@@ -39,6 +39,7 @@ def summarize(settings_obj: Settings) -> None:
             "project": settings_obj.gcp_project_id,
             "vertex_region": settings_obj.vertex_location,
             "gemini_model": settings_obj.gemini_model,
+            "gemini_developer_api_key_configured": bool(settings_obj.gemini_api_key),
             "embedding_model": settings_obj.embedding_model,
             "embedding_dimension": settings_obj.embedding_dimension,
             "langfuse_connected": langfuse_enabled(settings_obj),
@@ -97,8 +98,9 @@ with tab_lab:
 with tab_rag:
     st.subheader("Corpus ingestion")
     st.caption(
-        "Phase 1 binds `search_private_knowledge` to an in-memory corpus. Gemini still powers "
-        "`run_core_rag_turn_sync`; run `gcloud auth application-default login` before querying."
+        "Phase 1 binds `search_private_knowledge` to an in-memory corpus. Chat uses Gemini via "
+        "ADK — set GEMINI_API_KEY (or GOOGLE_API_KEY in `.env`) for the AI Studio path, "
+        "or rely on Vertex + `gcloud auth application-default login` without an API key."
     )
 
     offline_embeddings = st.toggle(

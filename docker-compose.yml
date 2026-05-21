@@ -7,10 +7,16 @@ services:
       - "8501:8501"
     env_file:
       - .env
+    # Vertex / Gemini ADC: reuse `gcloud auth application-default login` on the host.
+    # The image runs as root; GCP libraries read /root/.config/gcloud/application_default_credentials.json
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
     environment:
       GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-gd-gcp-gridu-genai}
       VERTEX_LOCATION: ${VERTEX_LOCATION:-europe-west4}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      # Optional Gemini Developer API (AI Studio); copied server-side into GOOGLE_API_KEY by the app.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-004}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
