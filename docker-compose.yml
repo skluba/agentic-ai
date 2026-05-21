@@ -1,0 +1,10 @@
+services:
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-gd-gcp-gridu-genai}
+      VERTEX_LOCATION: ${VERTEX_LOCATION:-europe-west4}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}

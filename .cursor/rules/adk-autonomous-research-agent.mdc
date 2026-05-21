@@ -1,0 +1,56 @@
+---
+description: Autonomous research agent with ADK, Vertex Gemini, FAISS, A2A, Streamlit on GCP
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Autonomous research agent (Python / ADK)
+
+Act as a **senior Python engineer** evolving a **research agent**: start from a minimal **RAG** core and grow it into a system that can **plan, execute, critique, and refine** its own research—with clear boundaries between steps and observable artifacts at each phase.
+
+## Tech stack (do not casually swap)
+
+| Area | Choice |
+|------|--------|
+| LLM | **Gemini 2.0 Flash** via **Vertex AI** |
+| Framework | **[Agent Development Kit (ADK)](https://google.github.io/adk-docs/)** — graphs / multi-agent patterns where they reduce coupling |
+| Cloud | **GCP**, project **`gd-gcp-gridu-genai`**; model access through **Vertex AI** |
+| Vector search | **FAISS** for **in-memory** document retrieval (isolate index build/load; document assumptions on dimensionality & refresh) |
+| Agent wire-up | **[A2A](https://github.com/a2aproject/A2A)** where **discovery, interoperability, or remote agents** matter; complement (not replace) MCP-style tools |
+| UI | **Streamlit** — thin orchestration over ADK/agent APIs; avoid business logic solely in widgets |
+| Runtime | **Docker** — reproducible installs, explicit env vars for region/project, non-root user when feasible |
+
+## Architecture intent
+
+```text
+RAG baseline → explicit planner → executor (tools + retrieval) → critic → refinement loop → (optional) A2A peers
+```
+
+- **Plan**: Goals, sub-questions, success criteria, and stopping conditions as structured outputs.
+- **Execute**: Deterministic retrieval (FAISS), tool calls, and LLM steps with traced inputs/outputs.
+- **Critique**: Check coverage, citations/sources consistency, contradictions, and goal satisfaction before “done.”
+- **Refine**: Re-plan or re-query minimally—avoid unbounded recursion; cap iterations and escalate to the user.
+
+## Implementation habits
+
+```python
+# ❌ BAD: one mega-prompt doing plan+search+answer with no checkpoints
+response = llm.chat("research everything about X and fix your own mistakes")
+
+# ✅ GOOD: separate stages with explicit artifacts (plan JSON, retrieval results, draft, critique)
+plan = planner.run(...)           # structured
+evidence = retriever.search(...)  # FAISS-backed, logged
+draft = synthesizer.run(plan, evidence)
+verdict = critic.run(plan, evidence, draft)
+```
+
+- Prefer **structured outputs** between stages over prose-only handoffs.
+- Keep **credentials out of code**; use env / GCP auth patterns appropriate to deployment.
+- Preserve **opacity** across A2A boundaries: expose capability via Agent Cards/protocol, not raw prompts or internal state.
+- Align with workspace rules: **`app/`** packages, **`pytest --cov=app`**, small **feature branches**.
+
+## Containers & UI
+
+- **Docker**: Pin base image and dependency versions; document `VERTEX_*`, `GOOGLE_CLOUD_PROJECT`, region, and any Streamlit/Web port.
+- **Streamlit**: Separate “session façade” from core agent modules so logic stays testable without the UI runner.
+

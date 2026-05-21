@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-ai"
+version = "0.1.0"
+description = "RAG-centric autonomous research stack (ADK, Vertex Gemini, FAISS, Streamlit)."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Grid Dynamics GenAI Team" }]
+dependencies = [
+  "google-adk>=2.0.0,<3",
+  "google-cloud-aiplatform>=1.70.0",
+  "a2a-sdk>=1.0,<2",
+  "faiss-cpu>=1.8.0",
+  "numpy>=1.26.0,<3",
+  "streamlit>=1.42.0",
+  "langfuse>=3,<4",
+  "pydantic>=2,<3",
+  "pydantic-settings>=2,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+  "pytest-cov>=5,<6",
+  "ruff>=0.14",
+]
+
+[project.scripts]
+agentic-ai-ui = "app.ui.cli:run_streamlit"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+pythonpath = ["."]
+
+[tool.coverage.run]
+branch = true
+source_pkgs = ["app"]
+
+[tool.coverage.report]
+fail_under = 80
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "\\.\\.\\.$",
+]

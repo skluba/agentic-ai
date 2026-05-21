@@ -1,0 +1,33 @@
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+.python-version
+
+# Tools
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# IDE
+.idea/
+*.swp
+.DS_Store
+
+# Cursor: keep rules; exclude heavy auto-synced vendor skills if present
+.cursor/skills/
