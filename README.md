@@ -35,6 +35,8 @@ agentic-ai-ui                   # launches Streamlit on :8501
 docker compose up --build rag-ui        # exposes http://localhost:8501
 ```
 
+The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (disable **offline embeddings** in the Phase 1 tab). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
+
 Self-hosted Langfuse uses the official Compose blueprint (PostgreSQL + Redis + ClickHouse + MinIO)—see **[docs/langfuse-self-hosted.md](docs/langfuse-self-hosted.md)** and the upstream **[Langfuse Compose guide](https://langfuse.com/self-hosting/deployment/docker-compose)**.
 
 ## GCP & Langfuse vars
@@ -45,10 +47,25 @@ Populate `.env` (values are illustrative):
 GOOGLE_CLOUD_PROJECT=gd-gcp-gridu-genai
 VERTEX_LOCATION=europe-west4
 GEMINI_MODEL=gemini-2.0-flash
+# Optional Gemini Developer API (AI Studio — used by ADK chat when set)
+GEMINI_API_KEY=
+
 LANGFUSE_HOST=http://localhost:3000       # omit to disable instrumentation
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
+EMBEDDING_MODEL=text-embedding-004       # Vertex text embeddings
+EMBEDDING_DIMENSION=768                  # must match model output dims
 ```
+
+### Phase 1: Core RAG MVP
+
+End-to-end **Plan → Execute → Synthesize** flow over a **private knowledge base**:
+
+1. **Ingest** — raw text is window-chunked with overlap (`app/knowledge/chunking.py`), embedded (`app/knowledge/embeddings.py`), L2-normalized, and indexed in **FAISS** (`app/knowledge/store.py`).
+2. **Execute** — the ADK agent `core_rag` (`app/agents/core_rag.py`) must call **`search_private_knowledge`** (`app/tools/document_search_tool.py`) before answering.
+3. **Synthesize** — the model summarizes grounded snippets into a concise reply.
+
+Try it in Streamlit (**Phase 1 RAG** tab): ingest sample notes, toggle **offline embeddings** for CI/local runs without Vertex embeddings, then ask a question — use **`GEMINI_API_KEY`** (or **`GOOGLE_API_KEY`**) for the AI Studio Gemini path or Vertex ADC **`gcloud auth application-default login`** for enterprise routing. Programmatic helper: `run_core_rag_turn_sync` / `run_core_rag_turn` in `app/agents/session_runner.py`.
 
 ---
 
@@ -69,11 +86,15 @@ Optional: SonarLint / IDE connected mode uses [`.sonarlint/connectedMode.json`](
 ## Repo map
 
 ```
-app/config.py               # pydantic-settings for Vertex + Langfuse
-app/rag/faiss_store.py      # deterministic in-memory retrieval slice
+app/config.py               # pydantic-settings for Vertex + Langfuse + embeddings
+app/knowledge/              # Phase 1 chunk → embed → FAISS corpus + search_chunks
+app/agents/core_rag.py      # Plan/Execute/Synthesize ADK agent + retrieval tool
+app/agents/session_runner.py
+app/tools/document_search_tool.py
+app/rag/faiss_store.py      # deterministic in-memory retrieval slice (lab demo)
 app/rag/lab_demo.py         # hierarchical @observe (chain + retriever spans)
 app/observability/          # Langfuse helpers + flush for scripts / Streamlit
-streamlit_app.py            # Loads .env first; propagate_attributes + session tags
+streamlit_app.py            # Loads .env first; Smoke + Phase 1 RAG tabs
 .cursor/skills/langfuse/    # upstream Langfuse agent skill (+ references/)
 infra / docs forthcoming    # richer ADK graphs + A2A wiring live here next
 ```

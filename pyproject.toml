@@ -45,6 +45,9 @@ src = ["app", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+"streamlit_app.py" = ["I001"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
@@ -53,6 +56,7 @@ pythonpath = ["."]
 [tool.coverage.run]
 branch = true
 source_pkgs = ["app"]
+relative_files = true
 
 [tool.coverage.report]
 fail_under = 80

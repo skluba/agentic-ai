@@ -1,29 +1,28 @@
 ---
-description: Keep Python test coverage for app code at 80% or higher
+description: Keep app package coverage ≥80% for new/changed code and project total
 alwaysApply: true
 ---
 
-# Test coverage (≥80%)
+# Test coverage (≥80%) — whole `app` and new work
 
-Coverage is measured for the **`app`** package (`pytest --cov=app`). When you add or change behavior under `app/`, keep **total coverage at 80% or higher** so CI and Sonar stay healthy.
+Coverage is **`app`** only (`pytest --cov=app`, `source_pkgs = ["app"]` in `pyproject.toml`). The repo enforces **`fail_under = 80`** in **`[tool.coverage.report]`** — CI/local runs fail if total coverage slips.
 
-## Before finishing a task
+## Requirements
 
-1. Run tests with a report:
+1. **Project-wide:** After substantive edits, **`TOTAL` coverage stays ≥80%** (aggregate for `app/`).
+2. **New/changed code:** Prefer meaningful tests for **`app/` modules you add or edit** — cover real branches (errors, guards, integrations with fakes/mocks); avoid dumping only `# pragma: no cover` unless justified (e.g. `TYPE_CHECKING` is excluded in `[tool.coverage.report]`).
 
-   ```bash
-   pytest --cov=app --cov-report=term-missing --cov-report=xml
-   ```
+## Before you finish
 
-2. If coverage drops below **80%**, add or extend tests in `tests/` for real branches (not trivial asserts). Prefer testing `app` modules you touched.
-3. Do not silence gaps with broad `# pragma: no cover` unless there is a strong reason (e.g. `if TYPE_CHECKING:` is already excluded in `[tool.coverage.report]` in `pyproject.toml`).
-
-## Optional hard gate
-
-To fail CI locally when under threshold, add to `[tool.coverage.report]` in `pyproject.toml`:
-
-```toml
-fail_under = 80
+```bash
+pytest --cov=app --cov-report=term-missing --cov-report=xml
 ```
 
-Only add `fail_under` in a dedicated change if the team wants CI to enforce the number automatically.
+If under **80%** or **`term-missing`** shows gaps in files you touched, extend **`tests/`** until the gate passes.
+
+```text
+❌ BAD: New logic in app/foo.py with no tests; rely on incidental coverage elsewhere
+✅ GOOD: Tests for branches you introduced in app/foo.py plus full-suite still ≥80%
+```
+
+Do **not** commit secrets under `tests/`; keep keys out of tracked fixtures.
