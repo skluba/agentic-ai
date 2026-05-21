@@ -26,7 +26,15 @@ class Settings(BaseSettings):
     vertex_location: str = Field(default="europe-west4", validation_alias="VERTEX_LOCATION")
     gemini_model: str = Field(default="gemini-2.0-flash", validation_alias="GEMINI_MODEL")
 
-    faiss_dimension: int = Field(default=128, ge=8, validation_alias="FAISS_EMBEDDING_DIMENSION")
+    embedding_model: str = Field(
+        default="text-embedding-004",
+        validation_alias="EMBEDDING_MODEL",
+    )
+    embedding_dimension: int = Field(
+        default=768,
+        ge=8,
+        validation_alias=AliasChoices("EMBEDDING_DIMENSION", "FAISS_EMBEDDING_DIMENSION"),
+    )
 
     langfuse_public_key: str | None = Field(default=None, validation_alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str | None = Field(default=None, validation_alias="LANGFUSE_SECRET_KEY")
