@@ -27,11 +27,7 @@ def test_langfuse_disabled_without_env():
     assert client is None
 
 
-def test_strict_mode_raises_when_incomplete(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("LANGFUSE_HOST", raising=False)
-    monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
-    monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
-
+def test_strict_mode_raises_when_incomplete():
     clear_settings_cache()
     with pytest.raises(LangfuseUnavailable):
         get_langfuse(strict=True)
@@ -39,18 +35,18 @@ def test_strict_mode_raises_when_incomplete(monkeypatch: pytest.MonkeyPatch):
 
 @patch("langfuse.Langfuse", autospec=False)
 def test_client_materializes_when_env_present(
-    MockLangfuse: MagicMock, monkeypatch: pytest.MonkeyPatch
+    mock_langfuse_class: MagicMock, monkeypatch: pytest.MonkeyPatch
 ):
     monkeypatch.setenv("LANGFUSE_HOST", "http://localhost:3010/")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk")
 
-    MockLangfuse.return_value = MagicMock(name="client")
+    mock_langfuse_class.return_value = MagicMock(name="client")
     clear_settings_cache()
     client = get_langfuse()
-    assert client is MockLangfuse.return_value
-    MockLangfuse.assert_called_once()
-    kw = MockLangfuse.call_args.kwargs
+    assert client is mock_langfuse_class.return_value
+    mock_langfuse_class.assert_called_once()
+    kw = mock_langfuse_class.call_args.kwargs
     assert kw["host"] == "http://localhost:3010"
 
 
@@ -62,7 +58,7 @@ def test_start_optional_span_noops_without_credentials(monkeypatch: pytest.Monke
 
 @patch("langfuse.Langfuse", autospec=False)
 def test_start_optional_span_returns_handle(
-    MockLangfuse: MagicMock, monkeypatch: pytest.MonkeyPatch
+    mock_langfuse_class: MagicMock, monkeypatch: pytest.MonkeyPatch
 ):
     monkeypatch.setenv("LANGFUSE_HOST", "http://langfuse/")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk")
@@ -71,7 +67,7 @@ def test_start_optional_span_returns_handle(
     span = MagicMock()
     lf = MagicMock()
     lf.start_span.return_value = span
-    MockLangfuse.return_value = lf
+    mock_langfuse_class.return_value = lf
 
     clear_settings_cache()
     handle = start_optional_span(name="demo", input={"k": "v"})

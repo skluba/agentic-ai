@@ -7,6 +7,7 @@ Canonical references:
 - [Agent Development Kit (ADK)](https://google.github.io/adk-docs/)
 - [Agent2Agent (A2A) protocol](https://github.com/a2aproject/A2A)
 - [Langfuse Docker Compose deployment](https://langfuse.com/self-hosting/deployment/docker-compose)
+- Langfuse Cursor skill synced from **[github.com/langfuse/skills](https://github.com/langfuse/skills)** into [`.cursor/skills/langfuse/`](./.cursor/skills/langfuse)
 
 ## Prerequisites
 
@@ -70,8 +71,10 @@ Optional: SonarLint / IDE connected mode uses [`.sonarlint/connectedMode.json`](
 ```
 app/config.py               # pydantic-settings for Vertex + Langfuse
 app/rag/faiss_store.py      # deterministic in-memory retrieval slice
-app/observability/          # Langfuse client helpers
-streamlit_app.py            # Thin UI façade
+app/rag/lab_demo.py         # hierarchical @observe (chain + retriever spans)
+app/observability/          # Langfuse helpers + flush for scripts / Streamlit
+streamlit_app.py            # Loads .env first; propagate_attributes + session tags
+.cursor/skills/langfuse/    # upstream Langfuse agent skill (+ references/)
 infra / docs forthcoming    # richer ADK graphs + A2A wiring live here next
 ```
 

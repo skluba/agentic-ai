@@ -29,5 +29,7 @@ htmlcov/
 *.swp
 .DS_Store
 
-# Cursor: keep rules; exclude heavy auto-synced vendor skills if present
-.cursor/skills/
+# Cursor vendor skills caches — keep synced Langfuse skill tracked
+.cursor/skills/*
+!.cursor/skills/langfuse/
+!.cursor/skills/langfuse/**
