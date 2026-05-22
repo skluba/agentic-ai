@@ -10,7 +10,7 @@ COPY pyproject.toml README.md LICENSE streamlit_app.py ./
 COPY app ./app
 
 RUN pip install --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir .
+    && pip install --no-cache-dir ".[phase3-fetch]"
 
 EXPOSE 8501
 

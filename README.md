@@ -23,7 +23,7 @@ Canonical references:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install --upgrade pip
-pip install -e ".[dev]"
+pip install -e ".[dev,phase3-fetch]"
 cp .env.example .env           # customise secrets / Langfuse URLs
 pytest --cov=app --cov-report=term-missing --cov-report=xml
 agentic-ai-ui                   # launches Streamlit on :8501
@@ -35,7 +35,7 @@ agentic-ai-ui                   # launches Streamlit on :8501
 docker compose up --build rag-ui        # exposes http://localhost:8501
 ```
 
-The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (toggle **offline embeddings** in Streamlit around the shared corpus). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
+The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (toggle **offline embeddings** in Streamlit around the shared corpus). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. **Phase 3** runs the MCP fetch preset by spawning `python -m mcp_server_fetch`; the Dockerfile installs **`[phase3-fetch]`** extras and Compose defaults **`MCP_FINANCIAL_FETCH_TRANSPORT=python`**. Override with **`docker`** (host Docker) or **`uvx`** on bare metal instead. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
 
 Self-hosted Langfuse uses the official Compose blueprint (PostgreSQL + Redis + ClickHouse + MinIO)—see **[docs/langfuse-self-hosted.md](docs/langfuse-self-hosted.md)** and the upstream **[Langfuse Compose guide](https://langfuse.com/self-hosting/deployment/docker-compose)**.
 
@@ -55,6 +55,10 @@ LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 EMBEDDING_MODEL=text-embedding-004       # Vertex text embeddings
 EMBEDDING_DIMENSION=768                  # must match model output dims
+
+# Phase 3 — MCP fetch server transport (docker | uvx | python)
+# MCP_FINANCIAL_FETCH_TRANSPORT=docker
+# MCP_FINANCIAL_DOCKER_IMAGE=mcp/fetch
 ```
 
 ### Phase 1: Core RAG MVP
@@ -76,6 +80,16 @@ Try it in Streamlit (**Phase 1 RAG** tab): ingest sample notes in the **shared c
 3. **Streamlit — Phase 2 tab** — shares the ingest strip with Phase 1 (`uploads` optional; grounding still available).
 
 Use **`run_phase2_external_turn_sync`** / **`run_phase2_external_turn`** from **`app/agents/session_runner.py`**.
+
+### Phase 3: MCP Yahoo finance + hybrid search
+
+**Goal:** retrieve **structured** HTML→markdown via the [reference MCP fetch server](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) and route finance questions away from generic web search when MCP data is usable.
+
+1. **MCP server** — local dev defaults: **`docker run -i --rm mcp/fetch`**, **`uvx mcp-server-fetch`**, or **`python -m mcp_server_fetch`** (`pip install ".[phase3-fetch]"`). See **`MCP_FINANCIAL_*`** env vars.
+2. **Financial tool** — **`fetch_yahoo_finance_markets_via_mcp`** (`app/tools/financial_markets_mcp_tool.py`) calls MCP `fetch` for the fixed Yahoo URLs: **most-active stocks**, **crypto markets**, **currencies**.
+3. **Planner** — optional corpus-first; use MCP for equities/crypto/FX intents; hosted **Google Search** for general research or finance fallbacks (`app/agents/phase3_mcp.py`).
+
+Helpers: **`run_phase3_mcp_turn_sync`** / **`run_phase3_mcp_turn`** in **`app/agents/session_runner.py`**. Streamlit: **Phase 3** tab.
 
 ---
 
@@ -100,13 +114,16 @@ app/config.py               # pydantic-settings for Vertex + Langfuse + embeddin
 app/knowledge/              # Phase 1 chunk → embed → FAISS corpus + search_chunks
 app/agents/core_rag.py      # Phase 1 Plan/Execute/Synthesize + document tool
 app/agents/external_knowledge.py # Phase 2 hybrid planner + corpus + Google Search grounding
+app/agents/phase3_mcp.py    # Phase 3 corpus + MCP Yahoo + Google Search routing
 app/agents/session_runner.py
 app/tools/document_search_tool.py
+app/tools/financial_markets_mcp_tool.py
 app/tools/google_search_tool.py
+app/mcp/                    # stdio MCP client + fetch batching helpers
 app/rag/faiss_store.py      # deterministic in-memory retrieval slice (lab demo)
 app/rag/lab_demo.py         # hierarchical @observe (chain + retriever spans)
 app/observability/          # Langfuse helpers + flush for scripts / Streamlit
-streamlit_app.py            # Loads .env first; Smoke + Phase 1 RAG tabs
+streamlit_app.py            # Loads .env first; smoke + Phase 1–3 tabs
 .cursor/skills/langfuse/    # upstream Langfuse agent skill (+ references/)
 infra / docs forthcoming    # richer ADK graphs + A2A wiring live here next
 ```

@@ -12,6 +12,7 @@ from google.genai import types
 
 from app.agents.core_rag import create_core_rag_agent
 from app.agents.external_knowledge import create_external_knowledge_agent
+from app.agents.phase3_mcp import create_phase3_mcp_agent
 from app.config import Settings
 from app.knowledge.store import KnowledgeCorpus
 
@@ -111,3 +112,40 @@ def run_phase2_external_turn_sync(**kwargs: Any) -> tuple[str, list[Event]]:
     import asyncio
 
     return asyncio.run(run_phase2_external_turn(**kwargs))
+
+
+async def run_phase3_mcp_turn(
+    *,
+    settings: Settings,
+    corpus: KnowledgeCorpus,
+    question: str,
+    user_id: str = "local-user",
+    session_id: str = "phase3-session",
+    app_label: str = "phase3_mcp",
+) -> tuple[str, list[Event]]:
+    """Phase-3 turn — corpus (optional), MCP Yahoo finance snapshots, plus Google Search."""
+    agent = create_phase3_mcp_agent(settings, corpus)
+    app = App(name=app_label, root_agent=agent)
+    runner = Runner(
+        app=app,
+        session_service=InMemorySessionService(),
+        auto_create_session=True,
+    )
+
+    events: list[Event] = []
+    async for event in runner.run_async(
+        user_id=user_id,
+        session_id=session_id,
+        new_message=_user_turn(question),
+        yield_user_message=False,
+    ):
+        events.append(event)
+
+    return concatenate_agent_text(events), events
+
+
+def run_phase3_mcp_turn_sync(**kwargs: Any) -> tuple[str, list[Event]]:
+    """Blocking façade for notebooks / Streamlit."""
+    import asyncio
+
+    return asyncio.run(run_phase3_mcp_turn(**kwargs))

@@ -1,4 +1,4 @@
-"""Streamlit façade for retrieval lab, Phase 1 RAG, and Phase 2 hybrid research."""
+"""Streamlit façade for retrieval lab, Phase 1 RAG, Phase 2 hybrid, and Phase 3 MCP finance."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from app.agents.session_runner import (  # noqa: E402
     concatenate_agent_text,
     run_core_rag_turn_sync,
     run_phase2_external_turn_sync,
+    run_phase3_mcp_turn_sync,
 )
 from app.config import Settings, clear_settings_cache, get_settings  # noqa: E402
 from app.knowledge import KnowledgeCorpus, build_embedder_from_settings  # noqa: E402
@@ -23,7 +24,10 @@ from app.observability import flush_langfuse, langfuse_enabled  # noqa: E402
 from app.rag.lab_demo import run_streamlit_lab  # noqa: E402
 from langfuse import propagate_attributes  # noqa: E402
 
-st.set_page_config(page_title="Agentic AI — RAG + hybrid research", layout="wide")
+_MSG_PROVIDE_QUESTION = "Provide a question."
+_REPLY_FALLBACK_MARKDOWN = "_No textual reply emitted — inspect events/logs._"
+
+st.set_page_config(page_title="Agentic AI — RAG + MCP hybrid", layout="wide")
 
 clear_settings_cache()
 settings = get_settings()
@@ -34,8 +38,10 @@ if "core_rag_session_id" not in st.session_state:
     st.session_state.core_rag_session_id = str(uuid4())
 if "phase2_session_id" not in st.session_state:
     st.session_state.phase2_session_id = str(uuid4())
+if "phase3_session_id" not in st.session_state:
+    st.session_state.phase3_session_id = str(uuid4())
 
-st.title("Agentic AI — retrieval + Phase 1 & 2 RAG")
+st.title("Agentic AI — retrieval + Phase 1, 2 & 3 agents")
 
 
 def summarize(settings_obj: Settings) -> None:
@@ -54,16 +60,19 @@ def summarize(settings_obj: Settings) -> None:
                 if langfuse_enabled(settings_obj)
                 else "Set LANGFUSE_* in `.env` to stream hierarchical traces."
             ),
+            "mcp_financial_fetch_transport": settings_obj.mcp_financial_fetch_transport,
+            "mcp_financial_docker_image": settings_obj.mcp_financial_docker_image,
         },
     )
 
 
 summarize(settings)
 
-st.markdown("### Shared knowledge corpus — Phase 1 & Phase 2")
+st.markdown("### Shared knowledge corpus — Phase 1, 2 & 3")
 st.caption(
-    "One corpus feeds Phase 1 private answers and Phase 2 hybrid grounding. "
-    "Configure ADC or GEMINI_API_KEY."
+    "Corpus-before-remote feeds Phase 1–3. Set ADC or GEMINI_API_KEY. Phase 3 needs the MCP fetch "
+    "server reachable via Docker (~`mcp/fetch`), **`uvx mcp-server-fetch`**, or `python -m "
+    "`mcp_server_fetch` — see MCP_FINANCIAL_* in `.env.example`."
 )
 
 offline_embeddings = st.toggle(
@@ -112,11 +121,12 @@ if st.button("Ingest corpus", type="primary"):
 
 st.metric("Chunk count", corpus_shared.chunk_count)
 
-tab_lab, tab_p1, tab_p2 = st.tabs(
+tab_lab, tab_p1, tab_p2, tab_p3 = st.tabs(
     [
         "Instrumentation smoke · FAISS",
         "Phase 1 · Core RAG (ADK)",
         "Phase 2 · External knowledge (Hybrid)",
+        "Phase 3 · MCP Yahoo finance",
     ],
 )
 
@@ -173,7 +183,7 @@ with tab_p1:
         if corpus_shared.chunk_count == 0:
             st.error("Ingest documents before asking questions.")
         elif not question.strip():
-            st.warning("Provide a question.")
+            st.warning(_MSG_PROVIDE_QUESTION)
         else:
             with st.spinner("Running Gemini + document search …"):
                 try:
@@ -189,7 +199,7 @@ with tab_p1:
                 else:
                     if not reply:
                         reply = concatenate_agent_text(raw_events)
-                    st.markdown(reply or "_No textual reply emitted — inspect events/logs._")
+                    st.markdown(reply or _REPLY_FALLBACK_MARKDOWN)
 
 
 with tab_p2:
@@ -210,7 +220,7 @@ with tab_p2:
 
     if ask2:
         if not question2.strip():
-            st.warning("Provide a question.")
+            st.warning(_MSG_PROVIDE_QUESTION)
         else:
             with st.spinner("Running Gemini + corpus + hosted Google Search …"):
                 try:
@@ -226,10 +236,48 @@ with tab_p2:
                 else:
                     if not reply2:
                         reply2 = concatenate_agent_text(raw_events2)
-                    st.markdown(reply2 or "_No textual reply emitted — inspect events/logs._")
+                    st.markdown(reply2 or _REPLY_FALLBACK_MARKDOWN)
+
+
+with tab_p3:
+    st.markdown(
+        "**Phase 3** adds **`fetch_yahoo_finance_markets_via_mcp`**: MCP **fetch** against "
+        "fixed Yahoo listings (most-active US equities, crypto, currencies). Hosted Google Search "
+        "covers non-finance intents and backs up when MCP yields nothing usable."
+    )
+    st.caption(
+        "`docker pull mcp/fetch` (recommended per upstream docs) **or** `uvx mcp-server-fetch`; "
+        "override with `MCP_FINANCIAL_FETCH_TRANSPORT` / image in `.env`."
+    )
+    question3 = st.text_input("Hybrid + finance question", "", key="phase3_q")
+    ask3 = st.button(
+        "Run Phase 3 · Corpus + MCP markets + hybrid search",
+        key="phase3_go",
+    )
+
+    if ask3:
+        if not question3.strip():
+            st.warning(_MSG_PROVIDE_QUESTION)
+        else:
+            with st.spinner("Running Gemini + corpus + MCP fetch + hosted search …"):
+                try:
+                    reply3, raw_events3 = run_phase3_mcp_turn_sync(
+                        settings=settings,
+                        corpus=corpus_shared,
+                        question=question3,
+                        user_id=st.session_state.get("core_user", "streamlit-operator"),
+                        session_id=st.session_state.phase3_session_id,
+                    )
+                except Exception as exc:
+                    st.error(f"Invocation failed — {exc!s}")
+                else:
+                    if not reply3:
+                        reply3 = concatenate_agent_text(raw_events3)
+                    st.markdown(reply3 or _REPLY_FALLBACK_MARKDOWN)
 
 
 st.caption(
-    "Phase 1 (`app/agents/core_rag.py`), Phase 2 (`app/agents/external_knowledge.py`), "
-    "shared tooling under `app/tools/`, corpus in `app/knowledge/store.py`."
+    "Phase 1 `app/agents/core_rag.py`; Phase 2 `app/agents/external_knowledge.py`; "
+    "Phase 3 `app/agents/phase3_mcp.py`; tools `app/tools/` (+ `app/mcp/` MCP client); corpus "
+    "`app/knowledge/store.py`."
 )
