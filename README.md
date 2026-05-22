@@ -31,7 +31,7 @@ agentic-ai-ui                   # launches Streamlit on :8501
 
 ### Manual QA (Streamlit)
 
-Step-by-step questions and paste-ready corpora for Phases **1–5** (including **A2A News Agent**): [`docs/manual-testing.md`](docs/manual-testing.md) and [`docs/examples/`](docs/examples/).
+Step-by-step questions and paste-ready corpora for Phases **1–6** (including **A2A News Agent** and **Canvas**): [`docs/manual-testing.md`](docs/manual-testing.md) and [`docs/examples/`](docs/examples/).
 
 ### Containers
 
@@ -131,6 +131,14 @@ Exported from **`app/agents/__init__.py`** for parity with earlier phases (`Refi
 
 Compose profile **`collaboration`** starts **`news-agent`** on `:8090`. Helpers **`run_phase5_collaborative_turn_sync`**.
 
+### Phase 6: Structured Canvas artefacts
+
+**Goal:** after Phase‑5‑style research, emit **stakeholder-ready** outputs (**Markdown reports**, lightweight **HTML** articles, fenced **code**) via **`produce_structured_canvas`** (**Jinja2** shell for HTML; **Pydantic** validates tool args — `app/canvas/models.py`).
+
+1. **Tool** — `app/tools/canvas_tool.py` (`make_canvas_delivery_tool`) returning JSON `{ ok, mime, output_kind, artifact, ... }`.
+2. **Planner** — `app/agents/phase6_canvas.py`: same research routing as Phase **5**, plus instructions to call Canvas when the user wants a memo/report/HTML/code artefact.
+3. **Helpers** — **`run_phase6_canvas_turn_sync`** / **`run_phase6_canvas_turn`** in **`app/agents/session_runner.py`**. Streamlit: **Phase 6** tab.
+
 ---
 
 ## QA + SonarCloud
@@ -158,6 +166,8 @@ app/agents/phase3_mcp.py    # Phase 3 corpus + MCP Yahoo + Google Search routing
 app/agents/refinement_loop.py # Phase 4 critique + iterative Phase-3 replans
 app/agents/news_focused.py  # standalone News KB + web agent backing A2A
 app/agents/phase5_collaborative.py # Phase 3 + delegated News briefing
+app/agents/phase6_canvas.py # Phase 5 + Canvas (Markdown/HTML/code) tool
+app/canvas/models.py           # Pydantic contracts for Canvas tool args
 app/agents/session_runner.py
 app/a2a/                    # A2A Starlette app + executor + uvicorn wiring
 app/tools/document_search_tool.py
@@ -169,7 +179,8 @@ app/mcp/                    # stdio MCP client + fetch batching helpers
 app/rag/faiss_store.py      # deterministic in-memory retrieval slice (lab demo)
 app/rag/lab_demo.py         # hierarchical @observe (chain + retriever spans)
 app/observability/          # Langfuse helpers + flush for scripts / Streamlit
-streamlit_app.py            # Loads `.env`; smoke + Phase 1–5 tabs
+app/tools/canvas_tool.py    # produce_structured_canvas (Jinja2 + Markdown)
+streamlit_app.py            # Loads `.env`; smoke + Phase 1–6 tabs
 .cursor/skills/langfuse/    # upstream Langfuse agent skill (+ references/)
 infra / docs forthcoming    # richer ADK graphs stay here next
 ```

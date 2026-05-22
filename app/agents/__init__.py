@@ -5,6 +5,7 @@ from app.agents.external_knowledge import create_external_knowledge_agent
 from app.agents.news_focused import create_news_kb_agent
 from app.agents.phase3_mcp import create_phase3_mcp_agent
 from app.agents.phase5_collaborative import create_phase5_collaborative_agent
+from app.agents.phase6_canvas import create_phase6_canvas_agent
 from app.agents.refinement_loop import (
     RefinementLoopResult,
     run_phase4_refinement_loop,
@@ -19,6 +20,8 @@ from app.agents.session_runner import (
     run_phase3_mcp_turn_sync,
     run_phase5_collaborative_turn,
     run_phase5_collaborative_turn_sync,
+    run_phase6_canvas_turn,
+    run_phase6_canvas_turn_sync,
 )
 
 __all__ = [
@@ -28,6 +31,7 @@ __all__ = [
     "create_news_kb_agent",
     "create_phase3_mcp_agent",
     "create_phase5_collaborative_agent",
+    "create_phase6_canvas_agent",
     "run_core_rag_turn",
     "run_core_rag_turn_sync",
     "run_phase2_external_turn",
@@ -38,4 +42,6 @@ __all__ = [
     "run_phase4_refinement_loop_sync",
     "run_phase5_collaborative_turn",
     "run_phase5_collaborative_turn_sync",
+    "run_phase6_canvas_turn",
+    "run_phase6_canvas_turn_sync",
 ]

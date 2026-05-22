@@ -16,6 +16,8 @@ from app.agents.session_runner import (
     run_phase3_mcp_turn_sync,
     run_phase5_collaborative_turn,
     run_phase5_collaborative_turn_sync,
+    run_phase6_canvas_turn,
+    run_phase6_canvas_turn_sync,
 )
 from app.config import Settings
 from app.knowledge import FakeEmbeddingBackend, KnowledgeCorpus
@@ -219,6 +221,52 @@ def test_run_phase5_collaborative_turn_sync_delegates():
 
     with patch("asyncio.run", return_value=sentinel) as mocked:
         out = run_phase5_collaborative_turn_sync(**kwargs)
+
+    mocked.assert_called_once()
+    assert out == sentinel
+
+
+def test_run_phase6_canvas_turn_mocked_runner():
+    empty_corpus = KnowledgeCorpus(FakeEmbeddingBackend(embedding_dim=12))
+    settings = Settings(
+        gcp_project_id="phase6-runner-test",
+        news_agent_a2a_base_url="http://stub",
+    )
+
+    evt = MagicMock()
+    evt.author = "phase6_canvas_hybrid"
+    evt.content = types.Content(role="model", parts=[types.Part(text="phase6 canvas reply")])
+
+    mock_runner_inst = MagicMock()
+
+    async def fake_run(**_kwargs):  # noqa: ANN003
+        yield evt
+
+    mock_runner_inst.run_async = fake_run
+
+    async def body() -> tuple[str, list]:
+        with patch("app.agents.session_runner.Runner", return_value=mock_runner_inst):
+            return await run_phase6_canvas_turn(
+                settings=settings,
+                corpus=empty_corpus,
+                question="Produce an HTML briefing on FX.",
+            )
+
+    text_out, collected = asyncio.run(body())
+    assert text_out == "phase6 canvas reply"
+    assert collected == [evt]
+
+
+def test_run_phase6_canvas_turn_sync_delegates():
+    sentinel: tuple[str, list] = ("p6-ok", [])
+    kwargs = {
+        "settings": Settings(gcp_project_id="phase6-sync"),
+        "corpus": KnowledgeCorpus(FakeEmbeddingBackend(8)),
+        "question": "memo?",
+    }
+
+    with patch("asyncio.run", return_value=sentinel) as mocked:
+        out = run_phase6_canvas_turn_sync(**kwargs)
 
     mocked.assert_called_once()
     assert out == sentinel
