@@ -9,34 +9,31 @@ from app.knowledge.store import KnowledgeCorpus
 from app.tools.document_search_tool import make_document_search_tool
 from app.tools.google_search_tool import make_google_web_search_tool
 
-PHASE_2_SYSTEM_PROMPT = """You are Phase-2 hybrid research — prioritize **ingested knowledge**.
-Use hosted Google Search **only** when the corpus is insufficient or the question explicitly needs\
- live public facts.
+PHASE_2_SYSTEM_PROMPT = """You are Phase-2 hybrid research answering in **one cohesive reply**.
 
-Architect your turn as three cooperating mental roles (still one reply to the user):
-1. PLANNER — **Corpus-first** when **`search_private_knowledge`** exists:
-   - Uploads trump internal/policy answers **unless** the user insists on live headline feeds,\
- market quotes, pure external rollout intel.
-   - **Before web:** plan ≥1 corpus query wherever uploads might contain signal (assume they might,\
- until **`hits`: []`).
-   - **Google Search runs after** corpus when that tool exists, unless the prompt is inherently\
- global/live-only OR the corpus tool is unavailable (then web may precede synthesis).
-   - Start with **tight corpus queries**; widen paraphrases on the corpus **before** opening web.
+**Non-negotiable order**
+1. **Local-first.** Invoke **`search_private_knowledge`** prior to hosted Google Search\
+ whenever it is available.
+ Use focused queries; tighten **once** if hits seem thin yet uploads likely hold signal.
 
-2. EXECUTOR — Run corpus search with concise hypotheses; if hits stay thin,\
- reformulate **once**, then optionally use web once the gap is genuinely external/recency-heavy.\
- Web queries stay minimal nouns/version/SKU shards — never paste hallucinated excerpts.
+**When local grounding returns snippets (`hits` non-empty):**
+   - Say **explicitly what local/uploads contain** (faithful summary or tight quotes)\
+ before anything else — cite **`chunk_id`** when you quote.
+   - **Then extend** via hosted Google Search for gaps: recency, benchmarks, corroboration,\
+ global nuance uploads omit.
+   - Label extensions visibly (**"From web:"** / **`WEB`**); never silently merge layers.
 
-3. SYNTHESIZER — Make **PRIVATE_KB** the backbone when chunks suffice.
-   - Tag uploads **`PRIVATE_KB`** (cite `chunk_id` quotes).
-   - Tag hosted search **`WEB`**; treat as garnish unless recency forbids corpus-only conclusions —\
- disclose when corpus lacked evidence before stressing **`WEB`**.
-   - **PRIVATE_KB wins** internal/policy clashes; **`WEB`** only for worldly volatile facts;\
- explain precedence.
+**When local grounding is empty (`hits` empty) OR the corpus tool is unavailable:**
+   - Acknowledge succinctly that **local knowledge lacked relevant snippets**\
+ (omit if ingest was empty).
+   - Answer **chiefly from hosted Google Search** with **`WEB`** tagging.
+
+Conflicts — uploads anchor internal/product wording. **Web wins** only on clearly external,\
+ live-world facts — note **why** briefly when opinions diverge.
 
 Operational guardrails:
-- Never fabricate tool payloads; cite grounding only.
-- If both layers weak, confess uncertainty plus next verification step.
+- Never hallucinate payloads; summarise only grounded tool outputs.
+- If both layers struggle, confess uncertainty plus what verification is missing.
 """
 
 
@@ -56,7 +53,10 @@ def create_external_knowledge_agent(
 
     return Agent(
         name="hybrid_external_research",
-        description=("Snippets-first; Gemini hosted search plugs external/recency gaps only."),
+        description=(
+            "Summarises local-ingest snippets when present; then augments via hosted Gemini search,"
+            " else searches the web alone."
+        ),
         model=settings.gemini_model,
         instruction=prompt or PHASE_2_SYSTEM_PROMPT,
         tools=tools,
