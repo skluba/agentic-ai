@@ -1,0 +1,17 @@
+GridU GenAI Lab — Scratch notes (fictional, for hybrid / web-augmented tests)
+Topic: Retrieval evaluation checklist
+
+These notes are intentionally short so you can paste them alongside the ACME memo and test
+multi-document retrieval.
+
+BULLETS
+- We use Gemini 2.0 Flash via Vertex in project gd-gcp-gridu-genai (example only).
+- FAISS flat index is in-memory for demos; production would use managed vector stores.
+- Langfuse traces should include session_id when testing from Streamlit.
+
+OPEN QUESTIONS
+- What latency budget do we accept for first-token on Plan → Execute agents?
+- Do we need per-tenant ACLs on chunk metadata before Phase 2 hybrid goes live?
+
+REMINDER
+When the private corpus lacks an answer, the hybrid agent should label web-sourced facts clearly.

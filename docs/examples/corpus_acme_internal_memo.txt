@@ -1,0 +1,28 @@
+ACME Corp — Internal memo (fictional, for manual RAG testing)
+Document ID reference: MEMO-2026-ORG-0421
+Classification: Internal — Engineering & Policy
+
+SUMMARY
+This memo records decisions about the “Northwind ingestion pipeline” rollout and the related
+customer data retention stance. It is written for product, security, and support teams.
+
+1. PIPELINE OVERVIEW
+The Northwind ingestion pipeline batches customer support transcripts weekly. Chunks are
+deduplicated by ticket_id before embeddings are computed. The pipeline owner is the Platform
+team (slack: #platform-ingest).
+
+2. RETENTION POLICY (AS OF 2026-Q1)
+Support transcript text is retained for 18 months in the primary object store. Derived
+embeddings and FAISS indices are rebuilt monthly; cold backups are kept for 7 years per legal.
+
+3. KNOWN ISSUES
+Ticket NW-8891: duplicate chunks were observed when users pasted the same error log twice.
+Mitigation shipped in release v2.3.1 (2026-01-15). Ops should verify chunk_id stability when
+re-ingesting historical tickets.
+
+4. CUSTOMER-FACING LANGUAGE
+Public docs must not promise “instant” search over transcripts; approved phrasing is
+“typically available within one business day after ticket closure.”
+
+5. CONTACT
+Questions: ingestion-oncall@acme.example (pager on weekends).
