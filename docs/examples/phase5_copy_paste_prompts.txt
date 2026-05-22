@@ -1,0 +1,15 @@
+# Phase 5 — copy/paste prompts (Streamlit "Phase 5 · A2A collaborative news")
+# Prerequisites: NEWS_AGENT_* URLs; collaboration Compose profile OR local uvicorn news service.
+# See docs/manual-testing.md for full playbook.
+
+--- Latest-news delegation (expects A2A call; web-heavy if News Agent KB is empty)
+Give a concise briefing of major generative-AI regulator headlines from the last few days with dates where possible.
+
+--- Corpus + delegation (ingest NEWSROOM stub + optionally ACME memo)
+Using our internal wire rules, summarize recent EU tech-policy headlines and flag anything that could conflict with our customer-facing wording rules from the ACME memo.
+
+--- MCP Yahoo + News (Phase 3 tools + delegated news)
+Pull the Yahoo "most active" equity snapshot via the finance tool, then give a short news-oriented context paragraph for the top symbol's sector (delegate to the News Agent if useful).
+
+--- Negative / absence check (orchestrator without NEWS_AGENT_A2A_BASE_URL)
+# Unset NEWS_AGENT_A2A_BASE_URL in .env and reload: expect warning in tab; MCP + search still run.

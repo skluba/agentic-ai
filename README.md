@@ -31,7 +31,7 @@ agentic-ai-ui                   # launches Streamlit on :8501
 
 ### Manual QA (Streamlit)
 
-Step-by-step questions and paste-ready corpora for Phases **1–4**: [`docs/manual-testing.md`](docs/manual-testing.md) and [`docs/examples/`](docs/examples/).
+Step-by-step questions and paste-ready corpora for Phases **1–5** (including **A2A News Agent**): [`docs/manual-testing.md`](docs/manual-testing.md) and [`docs/examples/`](docs/examples/).
 
 ### Containers
 
