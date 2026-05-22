@@ -10,8 +10,8 @@ COPY pyproject.toml README.md LICENSE streamlit_app.py ./
 COPY app ./app
 
 RUN pip install --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir ".[phase3-fetch]"
+    && pip install --no-cache-dir ".[phase3-fetch,news-agent]"
 
-EXPOSE 8501
+EXPOSE 8501 8090
 
 ENTRYPOINT ["streamlit", "run", "streamlit_app.py", "--server.address=0.0.0.0", "--browser.gatherUsageStats=false"]

@@ -1,4 +1,4 @@
-"""Streamlit façade for retrieval lab through Phase 4 refinement loop."""
+"""Streamlit façade for retrieval lab through Phase 5 collaborative A2A stack."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from app.agents.session_runner import (  # noqa: E402
     run_core_rag_turn_sync,
     run_phase2_external_turn_sync,
     run_phase3_mcp_turn_sync,
+    run_phase5_collaborative_turn_sync,
 )
 from app.config import Settings, clear_settings_cache, get_settings  # noqa: E402
 from app.knowledge import KnowledgeCorpus, build_embedder_from_settings  # noqa: E402
@@ -28,7 +29,7 @@ from langfuse import propagate_attributes  # noqa: E402
 _MSG_PROVIDE_QUESTION = "Provide a question."
 _REPLY_FALLBACK_MARKDOWN = "_No textual reply emitted — inspect events/logs._"
 
-st.set_page_config(page_title="Agentic AI — RAG + MCP + refinement loop", layout="wide")
+st.set_page_config(page_title="Agentic AI — RAG + MCP + A2A collaboration", layout="wide")
 
 clear_settings_cache()
 settings = get_settings()
@@ -43,8 +44,10 @@ if "phase3_session_id" not in st.session_state:
     st.session_state.phase3_session_id = str(uuid4())
 if "phase4_session_id" not in st.session_state:
     st.session_state.phase4_session_id = str(uuid4())
+if "phase5_session_id" not in st.session_state:
+    st.session_state.phase5_session_id = str(uuid4())
 
-st.title("Agentic AI — retrieval + Phase 1–4 agents")
+st.title("Agentic AI — retrieval + Phase 1–5 agents")
 
 
 def summarize(settings_obj: Settings) -> None:
@@ -58,6 +61,9 @@ def summarize(settings_obj: Settings) -> None:
             "embedding_model": settings_obj.embedding_model,
             "embedding_dimension": settings_obj.embedding_dimension,
             "langfuse_connected": langfuse_enabled(settings_obj),
+            "news_agent_orchestrator_url": settings_obj.news_agent_a2a_base_url or None,
+            "news_agent_standalone_public_url": settings_obj.news_agent_public_base_url or None,
+            "news_agent_http_timeout_seconds": settings_obj.news_agent_http_timeout_seconds,
             "langfuse_lab_session_hint": (
                 "Sessions view filters on `session_id` when Langfuse receives events."
                 if langfuse_enabled(settings_obj)
@@ -71,10 +77,11 @@ def summarize(settings_obj: Settings) -> None:
 
 summarize(settings)
 
-st.markdown("### Shared knowledge corpus — Phases 1–4")
+st.markdown("### Shared knowledge corpus — Phases 1–5")
 st.caption(
-    "Corpus feeds Phases 1–4 (Phase 4 stacks critique-driven refinements atop Phase 3)."
-    " Set ADC or GEMINI_API_KEY. Phase 3 needs MCP fetch; see MCP_FINANCIAL_* in `.env.example`."
+    "Corpus feeds Phases 1–5 (News Agent is a **second process** unless you mirror ingest)."
+    " Set ADC or GEMINI_API_KEY. Phase 3 MCP → MCP_FINANCIAL_*."
+    " Phase 5: `docker compose --profile collaboration up rag-ui news-agent` + NEWS_AGENT_*."
 )
 
 offline_embeddings = st.toggle(
@@ -123,13 +130,14 @@ if st.button("Ingest corpus", type="primary"):
 
 st.metric("Chunk count", corpus_shared.chunk_count)
 
-tab_lab, tab_p1, tab_p2, tab_p3, tab_p4 = st.tabs(
+tab_lab, tab_p1, tab_p2, tab_p3, tab_p4, tab_p5 = st.tabs(
     [
         "Instrumentation smoke · FAISS",
         "Phase 1 · Core RAG (ADK)",
         "Phase 2 · External knowledge (Hybrid)",
         "Phase 3 · MCP Yahoo finance",
         "Phase 4 · Autonomous refinement",
+        "Phase 5 · A2A collaborative news",
     ],
 )
 
@@ -351,9 +359,54 @@ with tab_p4:
                         st.json({"critiques": critiques_payload})
 
 
+with tab_p5:
+    st.markdown(
+        "**Phase 5** adds **`delegate_to_news_kb_specialist_via_a2a`**, forwarding digest-style "
+        "briefing to the standalone News Agent (**REST · A2A HTTP+JSON**)."
+    )
+    st.caption(
+        "`docker compose profile collaboration` runs `news-agent` on `:8090`. "
+        "Set **`NEWS_AGENT_PUBLIC_BASE_URL`** there and **`NEWS_AGENT_A2A_BASE_URL`** here "
+        "(e.g. `http://news-agent:8090`)."
+    )
+    if not settings.news_agent_a2a_base_url.strip():
+        st.warning(
+            "Orchestrator has no NEWS_AGENT_A2A_BASE_URL — delegation tool omitted.\n\n"
+            "MCP plus hosted search remain available.",
+        )
+
+    question5 = st.text_input("Collaborative Phase 5 question", "", key="phase5_q")
+    ask5 = st.button(
+        "Run Phase 5 · Hybrid + delegated News Agent (A2A)",
+        key="phase5_go",
+    )
+
+    if ask5:
+        if not question5.strip():
+            st.warning(_MSG_PROVIDE_QUESTION)
+        else:
+            with st.spinner("Running Phase 5 collaborator (MCP + search + optional A2A News) …"):
+                try:
+                    reply5, raw_events5 = run_phase5_collaborative_turn_sync(
+                        settings=settings,
+                        corpus=corpus_shared,
+                        question=question5,
+                        user_id=st.session_state.get("core_user", "streamlit-operator"),
+                        session_id=st.session_state.phase5_session_id,
+                    )
+                except Exception as exc:
+                    st.error(f"Invocation failed — {exc!s}")
+                else:
+                    if not reply5:
+                        reply5 = concatenate_agent_text(raw_events5)
+                    st.markdown(reply5 or _REPLY_FALLBACK_MARKDOWN)
+
+
 st.caption(
     "Phase 1 `app/agents/core_rag.py`; Phase 2 `app/agents/external_knowledge.py`; "
-    "Phase 3 `app/agents/phase3_mcp.py`; Phase 4 `app/agents/refinement_loop.py`; tools "
+    "Phase 3 `app/agents/phase3_mcp.py`; Phase 4 `app/agents/refinement_loop.py`; "
+    "Phase 5 `app/agents/phase5_collaborative.py` + `app/tools/news_agent_a2a_tool.py` "
+    "(News server `app/a2a/news_service.py`); tools "
     "`app/tools/` + `app/mcp/` MCP client; corpus `app/knowledge/store.py`; runner facades "
     "`app/agents/session_runner.py`."
 )

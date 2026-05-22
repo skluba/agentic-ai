@@ -66,6 +66,33 @@ class Settings(BaseSettings):
         description="Docker image for MCP fetch when transport=docker.",
     )
 
+    news_agent_a2a_base_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEWS_AGENT_A2A_BASE_URL", "NEWS_AGENT_URL"),
+        description=(
+            "Base HTTP URL reachable by the orchestrator for the standalone News Agent A2A card."
+        ),
+    )
+    news_agent_public_base_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEWS_AGENT_PUBLIC_BASE_URL"),
+        description=(
+            "Public URL echoed in /.well-known; must equal the REST base callers use to reach it."
+        ),
+    )
+    news_agent_use_offline_embeddings: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("NEWS_AGENT_USE_OFFLINE_EMBEDDINGS"),
+        description="Deterministic embeddings for the News Agent process (offline toggle).",
+    )
+    news_agent_http_timeout_seconds: float = Field(
+        default=120.0,
+        ge=5.0,
+        le=900.0,
+        validation_alias=AliasChoices("NEWS_AGENT_HTTP_TIMEOUT_SECONDS"),
+        description="HTTP timeout seconds for outbound A2A tooling from the orchestrator.",
+    )
+
 
 @lru_cache
 def get_settings(**overrides: Any) -> Settings:
