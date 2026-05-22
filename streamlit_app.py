@@ -1,4 +1,4 @@
-"""Streamlit façade for retrieval lab through Phase 5 collaborative A2A stack."""
+"""Streamlit façade for retrieval lab through Phase 6 Canvas + collaborative stacks."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 import streamlit as st  # noqa: E402
+import streamlit.components.v1 as components  # noqa: E402
 from app.agents.refinement_loop import run_phase4_refinement_loop_sync  # noqa: E402
 from app.agents.session_runner import (  # noqa: E402
     concatenate_agent_text,
@@ -19,7 +20,9 @@ from app.agents.session_runner import (  # noqa: E402
     run_phase2_external_turn_sync,
     run_phase3_mcp_turn_sync,
     run_phase5_collaborative_turn_sync,
+    run_phase6_canvas_turn_sync,
 )
+from app.canvas.artifact_extract import iter_canvas_artifacts_from_events  # noqa: E402
 from app.config import (  # noqa: E402
     Settings,
     clear_settings_cache,
@@ -34,7 +37,47 @@ from langfuse import propagate_attributes  # noqa: E402
 _MSG_PROVIDE_QUESTION = "Provide a question."
 _REPLY_FALLBACK_MARKDOWN = "_No textual reply emitted — inspect events/logs._"
 
-st.set_page_config(page_title="Agentic AI — RAG + MCP + A2A collaboration", layout="wide")
+
+def _render_phase6_canvas_previews(
+    artifacts: list[dict],
+    *,
+    max_html_height: int = 900,
+    min_html_height: int = 280,
+) -> None:
+    """Show Markdown / HTML / fenced code (Markdown) from Canvas tool payloads."""
+    if not artifacts:
+        return
+    st.divider()
+    st.markdown("##### Canvas artefacts")
+    st.caption(
+        "Live preview of **`produce_structured_canvas`** output (`artifact`). "
+        "HTML is sandboxed inside the iframe; Markdown uses Streamlit rendering."
+    )
+    for idx, art in enumerate(artifacts, start=1):
+        ok = art.get("ok")
+        kind = art.get("output_kind") or "?"
+        mime = art.get("mime") or ""
+        expanded = idx == len(artifacts)
+        label = f"Canvas #{idx} · {kind}"
+        if isinstance(ok, bool):
+            label += " — OK" if ok else " — failed"
+        with st.expander(label, expanded=expanded):
+            if ok is False:
+                st.error(art.get("error", "Canvas generation failed."))
+                continue
+            body = art.get("artifact")
+            if not isinstance(body, str) or not body.strip():
+                st.info("No `artifact` body in tool response.")
+                continue
+            if mime == "text/html":
+                line_based = body.count("\n") * 18 + 140
+                height = min(max_html_height, max(min_html_height, line_based))
+                components.html(body, height=height, scrolling=True)
+            else:
+                st.markdown(body)
+
+
+st.set_page_config(page_title="Agentic AI — RAG + MCP + A2A + Canvas", layout="wide")
 
 clear_settings_cache()
 settings = get_settings()
@@ -51,8 +94,10 @@ if "phase4_session_id" not in st.session_state:
     st.session_state.phase4_session_id = str(uuid4())
 if "phase5_session_id" not in st.session_state:
     st.session_state.phase5_session_id = str(uuid4())
+if "phase6_session_id" not in st.session_state:
+    st.session_state.phase6_session_id = str(uuid4())
 
-st.title("Agentic AI — retrieval + Phase 1–5 agents")
+st.title("Agentic AI — retrieval + Phase 1–6 agents")
 
 
 def summarize(settings_obj: Settings) -> None:
@@ -82,9 +127,9 @@ def summarize(settings_obj: Settings) -> None:
 
 summarize(settings)
 
-st.markdown("### Shared knowledge corpus — Phases 1–5")
+st.markdown("### Shared knowledge corpus — Phases 1–6")
 st.caption(
-    "Corpus feeds Phases 1–5 (News Agent is a **second process** unless you mirror ingest)."
+    "Corpus feeds Phases 1–6 (News Agent is a **second process** unless you mirror ingest)."
     " Set ADC or GEMINI_API_KEY. Phase 3 MCP → MCP_FINANCIAL_*."
     " Phase 5: `docker compose --profile collaboration up rag-ui news-agent` + NEWS_AGENT_*."
 )
@@ -135,7 +180,7 @@ if st.button("Ingest corpus", type="primary"):
 
 st.metric("Chunk count", corpus_shared.chunk_count)
 
-tab_lab, tab_p1, tab_p2, tab_p3, tab_p4, tab_p5 = st.tabs(
+tab_lab, tab_p1, tab_p2, tab_p3, tab_p4, tab_p5, tab_p6 = st.tabs(
     [
         "Instrumentation smoke · FAISS",
         "Phase 1 · Core RAG (ADK)",
@@ -143,6 +188,7 @@ tab_lab, tab_p1, tab_p2, tab_p3, tab_p4, tab_p5 = st.tabs(
         "Phase 3 · MCP Yahoo finance",
         "Phase 4 · Autonomous refinement",
         "Phase 5 · A2A collaborative news",
+        "Phase 6 · Canvas artefacts",
     ],
 )
 
@@ -416,11 +462,61 @@ with tab_p5:
                     st.markdown(reply5 or _REPLY_FALLBACK_MARKDOWN)
 
 
+with tab_p6:
+    st.markdown(
+        "**Phase 6** extends the Phase 5 collaborator with **`produce_structured_canvas`** "
+        "**(Jinja2 + Markdown)** — Markdown/HTML reports and fenced code artefacts after research "
+        "**(corpus / MCP / WEB / NEWS A2A)**."
+    )
+    st.caption(
+        "Ask explicitly for reports, stakeholder memos, or code snippets — the planner emits "
+        "structured artefacts while keeping prior guardrails intact. Successful runs surface "
+        "**Canvas artefacts** (expanders below the reply) with Markdown, HTML iframe, or "
+        "fenced-code previews sourced from tool JSON.",
+    )
+    _phase6_dns_hint = news_agent_a2a_url_host_resolution_hint(settings)
+    if _phase6_dns_hint:
+        st.warning(_phase6_dns_hint)
+    if not settings.news_agent_a2a_base_url.strip():
+        st.caption(
+            "NEWS_AGENT_A2A_BASE_URL unset — News delegation omitted; "
+            "MCP + WEB + Canvas stay active."
+        )
+
+    question6 = st.text_input("Phase 6 research + Canvas briefing", "", key="phase6_q")
+    ask6 = st.button(
+        "Run Phase 6 · Collaborative research + Canvas",
+        key="phase6_go",
+    )
+
+    if ask6:
+        if not question6.strip():
+            st.warning(_MSG_PROVIDE_QUESTION)
+        else:
+            with st.spinner("Running Phase 6 (tools + Canvas) …"):
+                try:
+                    reply6, raw_events6 = run_phase6_canvas_turn_sync(
+                        settings=settings,
+                        corpus=corpus_shared,
+                        question=question6,
+                        user_id=st.session_state.get("core_user", "streamlit-operator"),
+                        session_id=st.session_state.phase6_session_id,
+                    )
+                except Exception as exc:
+                    st.error(f"Invocation failed — {exc!s}")
+                else:
+                    if not reply6:
+                        reply6 = concatenate_agent_text(raw_events6)
+                    st.markdown(reply6 or _REPLY_FALLBACK_MARKDOWN)
+                    _render_phase6_canvas_previews(iter_canvas_artifacts_from_events(raw_events6))
+
+
 st.caption(
     "Phase 1 `app/agents/core_rag.py`; Phase 2 `app/agents/external_knowledge.py`; "
     "Phase 3 `app/agents/phase3_mcp.py`; Phase 4 `app/agents/refinement_loop.py`; "
     "Phase 5 `app/agents/phase5_collaborative.py` + `app/tools/news_agent_a2a_tool.py` "
-    "(News server `app/a2a/news_service.py`); tools "
+    "(News server `app/a2a/news_service.py`); Phase 6 `app/agents/phase6_canvas.py` + "
+    "`app/tools/canvas_tool.py` + `app/canvas/` schemas + `artifact_extract` previews; "
     "`app/tools/` + `app/mcp/` MCP client; corpus `app/knowledge/store.py`; runner facades "
     "`app/agents/session_runner.py`."
 )

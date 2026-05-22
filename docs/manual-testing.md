@@ -1,13 +1,13 @@
 # Manual testing (Streamlit RAG lab)
 
-Use this playbook to exercise **Phase 1–5** tabs in [`streamlit_app.py`](../streamlit_app.py) end-to-end. Example paste corpora live in [`examples/`](examples/).
+Use this playbook to exercise **Phase 1–6** tabs in [`streamlit_app.py`](../streamlit_app.py) end-to-end. Example paste corpora live in [`examples/`](examples/).
 
 ## Prerequisites
 
 | Need | Purpose |
 |------|---------|
 | Python env from repo root | `pip install -e ".[dev,phase3-fetch,news-agent]"` ([README](../README.md)) |
-| Gemini / Vertex | Phases **1**, **2**, **4**, **5**: Application Default Credentials and `GOOGLE_CLOUD_PROJECT` + region. Optional `GEMINI_API_KEY` fallback. |
+| Gemini / Vertex | Phases **1**, **2**, **4**, **5**, **6**: Application Default Credentials and `GOOGLE_CLOUD_PROJECT` + region. Optional `GEMINI_API_KEY` fallback. |
 | Langfuse keys (optional) | Tracing on **Instrumentation**. For **`rag-ui` in Docker**, **`LANGFUSE_HOST=http://localhost:3000`** hits the container — use **`http://host.docker.internal:3000`** if Langfuse runs on the host (Docker Desktop), or omit keys. |
 | **Phase 3** | Yahoo MCP **`fetch`** (see [README](../README.md)). **`rag-ui`** Compose pins **`python -m`**; host `.env` **`docker`** is ignored there. |
 | **Phase 5** | Standalone **News Agent** on **:8090**; **`docker compose`** collaboration profile pins internal URLs (see [`.env.example`](../.env.example)). |
@@ -16,12 +16,12 @@ Use this playbook to exercise **Phase 1–5** tabs in [`streamlit_app.py`](../st
 
 | Where you ingest | What it affects |
 |------------------|-----------------|
-| **Streamlit · shared corpus strip** | FAISS for **`rag-ui`** only — Phase **1**, **2**, **3**, **4**, **5** orchestrator. |
+| **Streamlit · shared corpus strip** | FAISS for **`rag-ui`** only — Phase **1**, **2**, **3**, **4**, **5**, **6** orchestrator. |
 | **`news-agent` container / uvicorn process** | Starts with an **empty** [`KnowledgeCorpus`](../app/knowledge/store.py) unless you extend deployment to load text. |
 
 So **`delegate_to_news_kb_specialist_via_a2a`** often returns briefing sections labeled **`NEWS_AGENT · WEB`** (web-first) while the orchestrator still uses your Streamlit ingest for **`search_private_knowledge`**. That split is expected in the default Compose stack.
 
-## Shared corpus strip (first step for Phases 1–2, 4–5 orchestrator)
+## Shared corpus strip (first step for Phases 1–2, 4–6 orchestrator)
 
 1. Enter a stable **human-readable corpus label**, e.g. `manual-demo-acme-gridu`.
 2. Open and copy **[`examples/corpus_acme_internal_memo.txt`](examples/corpus_acme_internal_memo.txt)** into **Paste knowledge-base text**, then click **Ingest corpus**.
@@ -117,7 +117,18 @@ If MCP is down: expect **error path** with a clear message — log as defect onl
 | MCP + News | “Show Yahoo most-actives via the finance tool, then one paragraph of sector news context.” | MCP table plus optional A2A news paragraph. |
 | Config off | Clear **`NEWS_AGENT_A2A_BASE_URL`** → reload app | Warning in tab; Phase **5** run still engages Phase **3**-class tools **without** the delegation tool. |
 
-## Files in `examples/`
+---
+
+### Phase 6 — Canvas (reports / HTML / code)
+
+**Depends on**: Same tool stack expectations as Phase **5** (optional corpus, MCP, web, **`REMOTE_NEWS_AGENT`** when configured). Canvas does not require separate infrastructure.
+
+| Scenario | Example question | What good looks like |
+|----------|------------------|---------------------|
+| Markdown memo | After ingesting memo + optional web/MCP lookups: “Write a **one-page Markdown executive memo** on our transcript retention stance vs. industry norms.” | Natural-language reply **and** evidence the model invoked **`produce_structured_canvas`** with `output_kind=markdown_report` (expand **Agent events** / tool trace if exposed); JSON `artifact` is long-form Markdown starting with `# <title>`. |
+| HTML article | “Turn the Yahoo FX snippets from the MCP tool into an **HTML** stakeholder brief with headings.” | `output_kind=html_report`; `mime` **`text/html`** in tool JSON; snippet includes `<article>` wrapper. |
+| Code sample | “After summarising the pipeline notes, output a **Python** pseudo-script that lists ingestion steps.” | `output_kind=code_snippet` with non-empty **`programming_language`**; fenced block in `artifact`. |
+| UI preview | Run any scenario above in Streamlit Phase **6** tab | After the narrative reply, **Canvas artefacts** expanders appear: Markdown/code render as Streamlit Markdown; **HTML** opens in a sandboxed iframe. Failed tool JSON shows as **failed** with the error string. |
 
 | File | Role |
 |------|------|
@@ -128,4 +139,4 @@ If MCP is down: expect **error path** with a clear message — log as defect onl
 
 ## Reporting issues
 
-Note: corpus label used, Gemini model ID, MCP up/down, **`NEWS_AGENT_*` values**, whether **News Agent** responded at `8090`, and **short repro question**. Attach Langfuse trace ID if instrumentation was on.
+Note: corpus label used, Gemini model ID, MCP up/down, **`NEWS_AGENT_*` values**, whether **News Agent** responded at `8090`, whether you exercised **Canvas** (`produce_structured_canvas`), and **short repro question**. Attach Langfuse trace ID if instrumentation was on.
