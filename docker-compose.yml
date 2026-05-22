@@ -26,7 +26,9 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-004}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
-      NEWS_AGENT_PUBLIC_BASE_URL: ${NEWS_AGENT_PUBLIC_BASE_URL:-http://news-agent:8090}
+      # Card JSON lists this REST base — must match callers on the Compose network (see rag-ui fix).
+      # Host only .env `http://localhost:8090` breaks follow-up HTTP from rag-ui ("connection failed").
+      NEWS_AGENT_PUBLIC_BASE_URL: http://news-agent:8090
       NEWS_AGENT_USE_OFFLINE_EMBEDDINGS: ${NEWS_AGENT_USE_OFFLINE_EMBEDDINGS:-true}
 
   rag-ui:
@@ -49,6 +51,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-004}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
+      # Langfuse on the host cannot be reached as http://localhost:3000 inside this container.
+      # Prefer LANGFUSE_HOST=http://host.docker.internal:3000 (Docker Desktop) or unset LANGFUSE_* here.
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
       MCP_FINANCIAL_FETCH_TRANSPORT: ${MCP_FINANCIAL_FETCH_TRANSPORT:-python}
       MCP_FINANCIAL_DOCKER_IMAGE: ${MCP_FINANCIAL_DOCKER_IMAGE:-mcp/fetch}

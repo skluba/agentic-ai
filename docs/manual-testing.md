@@ -8,9 +8,9 @@ Use this playbook to exercise **Phase 1–5** tabs in [`streamlit_app.py`](../st
 |------|---------|
 | Python env from repo root | `pip install -e ".[dev,phase3-fetch,news-agent]"` ([README](../README.md)) |
 | Gemini / Vertex | Phases **1**, **2**, **4**, **5**: Application Default Credentials and `GOOGLE_CLOUD_PROJECT` + region. Optional `GEMINI_API_KEY` fallback. |
-| Langfuse keys (optional) | Tracing smoke test on **Instrumentation**. |
+| Langfuse keys (optional) | Tracing on **Instrumentation**. For **`rag-ui` in Docker**, **`LANGFUSE_HOST=http://localhost:3000`** hits the container — use **`http://host.docker.internal:3000`** if Langfuse runs on the host (Docker Desktop), or omit keys. |
 | **Phase 3** | Finance MCP demo expects the Yahoo MCP fetch path per [README](../README.md). Without it, expect tool errors (not app crashes). |
-| **Phase 5** | Standalone **News Agent** (A2A HTTP+JSON on **:8090**) **and** orchestrator **`NEWS_AGENT_A2A_BASE_URL`** pointing at it. In Docker use profile **`collaboration`** (`rag-ui` + `news-agent`). Set **`NEWS_AGENT_PUBLIC_BASE_URL`** on the News service (advertised agent card URL; see [`.env.example`](../.env.example)). |
+| **Phase 5** | Standalone **News Agent** on **:8090**; **`docker compose`** collaboration profile pins internal URLs (see [`.env.example`](../.env.example)). |
 
 ## Two-process caveat (Phase 5 corpus)
 
@@ -40,15 +40,14 @@ docker compose --profile collaboration up --build rag-ui news-agent
 
 - UI: `http://localhost:8501` — open **Phase 5 · A2A collaborative news**.
 - News Agent health: `GET http://localhost:8090/.well-known/agent-card.json` with header `A2A-Version: 1.0` (expect JSON agent card).
-- **Orchestrator URL:** `docker-compose.yml` sets **`NEWS_AGENT_A2A_BASE_URL=http://news-agent:8090`** for the **`rag-ui`** service (Compose internal DNS — do **not** set this to `localhost` inside the container).
-- **`NEWS_AGENT_PUBLIC_BASE_URL`** in `.env`: use **`http://localhost:8090`** when callers reach the standalone agent via the published host port.
+- **Orchestrator + agent card base:** `docker-compose.yml` pins **`NEWS_AGENT_A2A_BASE_URL`** and **`NEWS_AGENT_PUBLIC_BASE_URL`** to **`http://news-agent:8090`** on both services (so A2A follow-up calls from **`rag-ui`** are not sent to **`localhost`**). You can still probe health from the host at **`http://localhost:8090`** via port mapping.
 
 ### Troubleshooting Phase 5
 
 | Symptom | Likely cause | Fix |
 |--------|----------------|-----|
 | `Network communication error ... news-agent ... [Errno -2] Name or service not known` | **A)** Streamlit on the **host** with **`NEWS_AGENT_A2A_BASE_URL=http://news-agent:8090`** — that hostname exists only on Compose DNS. **B)** **`news-agent` container is not Up** (often **Exited (2)**): the image used **`ENTRYPOINT streamlit`** while Compose passed **`uvicorn`**, so Uvicorn never bound to 8090 (fixed in current **`Dockerfile`**: empty `ENTRYPOINT`, Streamlit as **`CMD`** only). | **A)** **`NEWS_AGENT_A2A_BASE_URL=http://localhost:8090`** in `.env`; restart host Streamlit. **B)** Run **`docker compose --profile collaboration ps`** — **`news-agent`** must be **Up**. Rebuild: **`docker compose --profile collaboration build --no-cache news-agent`** then **`up -d`**; check logs: **`docker compose logs news-agent`** (expect Uvicorn listening, not Streamlit). |
-| Card fetch works from browser but delegation fails inside `rag-ui` | Rare: mis-typed **`NEWS_AGENT_A2A_BASE_URL`** overriding compose (should not occur — compose sets a literal). | Inspect **Active configuration** JSON in Streamlit; expect `news_agent_orchestrator_url` **`http://news-agent:8090`** when UI is Dockerized. |
+| `Network communication error ... All connection attempts failed` (after **`GET /.well-known/agent-card.json` succeeds from `rag-ui`) | Host `.env` set **`NEWS_AGENT_PUBLIC_BASE_URL=http://localhost:8090`** so **`AgentCard.supported_interfaces[].url`** pointed at **`localhost`**; from **`rag-ui`**, **localhost** is the Streamlit container, so follow-up RPC never reaches **`news-agent`**. Compose now pins **`NEWS_AGENT_PUBLIC_BASE_URL=http://news-agent:8090`** on the **`news-agent`** service (`docker-compose.yml`). | **`docker compose up -d news-agent`** (or **`--force-recreate`**) after pulling compose changes; **`docker compose logs`** should show follow-up **`POST`** traffic from **`172.*`** peers. |
 
 ## Tab-by-tab checklist
 

@@ -370,12 +370,12 @@ with tab_p5:
         "briefing to the standalone News Agent (**REST · A2A HTTP+JSON**)."
     )
     st.caption(
-        "**Compose (`rag-ui` + `news-agent`):** delegation URL is **`http://news-agent:8090`** "
-        "inside containers (wired in `docker-compose.yml`). **Host-only Streamlit** "
-        "(`agentic-ai-ui`): use **`http://localhost:8090`** — the hostname "
-        "**`news-agent`** does **not** resolve outside Compose."
-        " Set **`NEWS_AGENT_PUBLIC_BASE_URL`** so the standalone agent advertises "
-        "**`http://localhost:8090`** when you call it from your laptop."
+        "**Compose (`rag-ui` + `news-agent`):** `docker-compose.yml` pins "
+        "**`NEWS_AGENT_A2A_BASE_URL`** and **`NEWS_AGENT_PUBLIC_BASE_URL`** "
+        "to **`http://news-agent:8090`** so discovery and agent-card follow-up RPC stay on the "
+        "bridge network (host `.env` **`localhost`** would send A2A into the wrong socket). "
+        "**Host Streamlit only** (`agentic-ai-ui`): set both **`NEWS_AGENT_A2A_BASE_URL`** and "
+        "**`NEWS_AGENT_PUBLIC_BASE_URL`** to **`http://localhost:8090`**."
     )
     _phase5_dns_hint = news_agent_a2a_url_host_resolution_hint(settings)
     if _phase5_dns_hint:
