@@ -91,6 +91,16 @@ Use **`run_phase2_external_turn_sync`** / **`run_phase2_external_turn`** from **
 
 Helpers: **`run_phase3_mcp_turn_sync`** / **`run_phase3_mcp_turn`** in **`app/agents/session_runner.py`**. Streamlit: **Phase 3** tab.
 
+### Phase 4: Autonomous refinement loop
+
+**Goal:** move from one-shot execution to an **iterative** flow: Phase‑3 hybrid research → **LLM critique JSON** (satisfaction flag, gaps, follow-up sub-queries) → optional **additional research** passes, capped by **`max_critique_iterations`**.
+
+1. **Critique prompt** — reviewer-style system instruction with JSON-only structured output (`CritiqueDecision`).
+2. **Loop** — orchestrated in **`run_phase4_refinement_loop`** / **`run_phase4_refinement_loop_sync`** (`app/agents/refinement_loop.py`): each refinement cycle critiques the latest draft, then — if still unsatisfied and budget remains — replans via a composite follow-up prompt (gaps + actionable queries) for another Phase‑3 run.
+3. **Streamlit — Phase 4 tab** — exposes the iteration budget plus an expandable refinement trace (`research_rounds`, `critiques`).
+
+Exported from **`app/agents/__init__.py`** for parity with earlier phases (`RefinementLoopResult`).
+
 ---
 
 ## QA + SonarCloud
@@ -115,6 +125,7 @@ app/knowledge/              # Phase 1 chunk → embed → FAISS corpus + search_
 app/agents/core_rag.py      # Phase 1 Plan/Execute/Synthesize + document tool
 app/agents/external_knowledge.py # Phase 2 hybrid planner + corpus + Google Search grounding
 app/agents/phase3_mcp.py    # Phase 3 corpus + MCP Yahoo + Google Search routing
+app/agents/refinement_loop.py # Phase 4 critique + iterative Phase-3 replans
 app/agents/session_runner.py
 app/tools/document_search_tool.py
 app/tools/financial_markets_mcp_tool.py
@@ -123,7 +134,7 @@ app/mcp/                    # stdio MCP client + fetch batching helpers
 app/rag/faiss_store.py      # deterministic in-memory retrieval slice (lab demo)
 app/rag/lab_demo.py         # hierarchical @observe (chain + retriever spans)
 app/observability/          # Langfuse helpers + flush for scripts / Streamlit
-streamlit_app.py            # Loads .env first; smoke + Phase 1–3 tabs
+streamlit_app.py            # Loads `.env`; smoke + Phase 1–4 tabs
 .cursor/skills/langfuse/    # upstream Langfuse agent skill (+ references/)
 infra / docs forthcoming    # richer ADK graphs + A2A wiring live here next
 ```
