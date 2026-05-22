@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 import streamlit as st  # noqa: E402
+import streamlit.components.v1 as components  # noqa: E402
 from app.agents.refinement_loop import run_phase4_refinement_loop_sync  # noqa: E402
 from app.agents.session_runner import (  # noqa: E402
     concatenate_agent_text,
@@ -21,6 +22,7 @@ from app.agents.session_runner import (  # noqa: E402
     run_phase5_collaborative_turn_sync,
     run_phase6_canvas_turn_sync,
 )
+from app.canvas.artifact_extract import iter_canvas_artifacts_from_events  # noqa: E402
 from app.config import (  # noqa: E402
     Settings,
     clear_settings_cache,
@@ -34,6 +36,46 @@ from langfuse import propagate_attributes  # noqa: E402
 
 _MSG_PROVIDE_QUESTION = "Provide a question."
 _REPLY_FALLBACK_MARKDOWN = "_No textual reply emitted — inspect events/logs._"
+
+
+def _render_phase6_canvas_previews(
+    artifacts: list[dict],
+    *,
+    max_html_height: int = 900,
+    min_html_height: int = 280,
+) -> None:
+    """Show Markdown / HTML / fenced code (Markdown) from Canvas tool payloads."""
+    if not artifacts:
+        return
+    st.divider()
+    st.markdown("##### Canvas artefacts")
+    st.caption(
+        "Live preview of **`produce_structured_canvas`** output (`artifact`). "
+        "HTML is sandboxed inside the iframe; Markdown uses Streamlit rendering."
+    )
+    for idx, art in enumerate(artifacts, start=1):
+        ok = art.get("ok")
+        kind = art.get("output_kind") or "?"
+        mime = art.get("mime") or ""
+        expanded = idx == len(artifacts)
+        label = f"Canvas #{idx} · {kind}"
+        if isinstance(ok, bool):
+            label += " — OK" if ok else " — failed"
+        with st.expander(label, expanded=expanded):
+            if ok is False:
+                st.error(art.get("error", "Canvas generation failed."))
+                continue
+            body = art.get("artifact")
+            if not isinstance(body, str) or not body.strip():
+                st.info("No `artifact` body in tool response.")
+                continue
+            if mime == "text/html":
+                line_based = body.count("\n") * 18 + 140
+                height = min(max_html_height, max(min_html_height, line_based))
+                components.html(body, height=height, scrolling=True)
+            else:
+                st.markdown(body)
+
 
 st.set_page_config(page_title="Agentic AI — RAG + MCP + A2A + Canvas", layout="wide")
 
@@ -428,7 +470,9 @@ with tab_p6:
     )
     st.caption(
         "Ask explicitly for reports, stakeholder memos, or code snippets — the planner emits "
-        "structured artefacts while keeping prior guardrails intact."
+        "structured artefacts while keeping prior guardrails intact. Successful runs surface "
+        "**Canvas artefacts** (expanders below the reply) with Markdown, HTML iframe, or "
+        "fenced-code previews sourced from tool JSON.",
     )
     _phase6_dns_hint = news_agent_a2a_url_host_resolution_hint(settings)
     if _phase6_dns_hint:
@@ -464,6 +508,7 @@ with tab_p6:
                     if not reply6:
                         reply6 = concatenate_agent_text(raw_events6)
                     st.markdown(reply6 or _REPLY_FALLBACK_MARKDOWN)
+                    _render_phase6_canvas_previews(iter_canvas_artifacts_from_events(raw_events6))
 
 
 st.caption(
@@ -471,7 +516,7 @@ st.caption(
     "Phase 3 `app/agents/phase3_mcp.py`; Phase 4 `app/agents/refinement_loop.py`; "
     "Phase 5 `app/agents/phase5_collaborative.py` + `app/tools/news_agent_a2a_tool.py` "
     "(News server `app/a2a/news_service.py`); Phase 6 `app/agents/phase6_canvas.py` + "
-    "`app/tools/canvas_tool.py` + `app/canvas/` schemas; "
+    "`app/tools/canvas_tool.py` + `app/canvas/` schemas + `artifact_extract` previews; "
     "`app/tools/` + `app/mcp/` MCP client; corpus `app/knowledge/store.py`; runner facades "
     "`app/agents/session_runner.py`."
 )

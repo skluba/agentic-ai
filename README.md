@@ -137,7 +137,7 @@ Compose profile **`collaboration`** starts **`news-agent`** on `:8090`. Helpers 
 
 1. **Tool** — `app/tools/canvas_tool.py` (`make_canvas_delivery_tool`) returning JSON `{ ok, mime, output_kind, artifact, ... }`.
 2. **Planner** — `app/agents/phase6_canvas.py`: same research routing as Phase **5**, plus instructions to call Canvas when the user wants a memo/report/HTML/code artefact.
-3. **Helpers** — **`run_phase6_canvas_turn_sync`** / **`run_phase6_canvas_turn`** in **`app/agents/session_runner.py`**. Streamlit: **Phase 6** tab.
+3. **Helpers** — **`run_phase6_canvas_turn_sync`** / **`run_phase6_canvas_turn`** in **`app/agents/session_runner.py`**. Streamlit: **Phase 6** tab with **Markdown / HTML iframe / fenced-code previews** parsed from Canvas tool responses.
 
 ---
 
@@ -168,6 +168,7 @@ app/agents/news_focused.py  # standalone News KB + web agent backing A2A
 app/agents/phase5_collaborative.py # Phase 3 + delegated News briefing
 app/agents/phase6_canvas.py # Phase 5 + Canvas (Markdown/HTML/code) tool
 app/canvas/models.py           # Pydantic contracts for Canvas tool args
+app/canvas/artifact_extract.py # pull Canvas JSON from ADK function-response events
 app/agents/session_runner.py
 app/a2a/                    # A2A Starlette app + executor + uvicorn wiring
 app/tools/document_search_tool.py

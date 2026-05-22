@@ -128,9 +128,7 @@ If MCP is down: expect **error path** with a clear message — log as defect onl
 | Markdown memo | After ingesting memo + optional web/MCP lookups: “Write a **one-page Markdown executive memo** on our transcript retention stance vs. industry norms.” | Natural-language reply **and** evidence the model invoked **`produce_structured_canvas`** with `output_kind=markdown_report` (expand **Agent events** / tool trace if exposed); JSON `artifact` is long-form Markdown starting with `# <title>`. |
 | HTML article | “Turn the Yahoo FX snippets from the MCP tool into an **HTML** stakeholder brief with headings.” | `output_kind=html_report`; `mime` **`text/html`** in tool JSON; snippet includes `<article>` wrapper. |
 | Code sample | “After summarising the pipeline notes, output a **Python** pseudo-script that lists ingestion steps.” | `output_kind=code_snippet` with non-empty **`programming_language`**; fenced block in `artifact`. |
-| Phase 5 parity | Same Phase **5** news/MCP prompts | Research tools fire as in Phase **5**; Canvas only when user asks for a **deliverable** format. |
-
-## Files in `examples/`
+| UI preview | Run any scenario above in Streamlit Phase **6** tab | After the narrative reply, **Canvas artefacts** expanders appear: Markdown/code render as Streamlit Markdown; **HTML** opens in a sandboxed iframe. Failed tool JSON shows as **failed** with the error string. |
 
 | File | Role |
 |------|------|
