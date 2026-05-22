@@ -1,4 +1,4 @@
-"""Streamlit façade for retrieval lab, Phase 1 RAG, Phase 2 hybrid, and Phase 3 MCP finance."""
+"""Streamlit façade for retrieval lab through Phase 4 refinement loop."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 import streamlit as st  # noqa: E402
+from app.agents.refinement_loop import run_phase4_refinement_loop_sync  # noqa: E402
 from app.agents.session_runner import (  # noqa: E402
     concatenate_agent_text,
     run_core_rag_turn_sync,
@@ -27,7 +28,7 @@ from langfuse import propagate_attributes  # noqa: E402
 _MSG_PROVIDE_QUESTION = "Provide a question."
 _REPLY_FALLBACK_MARKDOWN = "_No textual reply emitted — inspect events/logs._"
 
-st.set_page_config(page_title="Agentic AI — RAG + MCP hybrid", layout="wide")
+st.set_page_config(page_title="Agentic AI — RAG + MCP + refinement loop", layout="wide")
 
 clear_settings_cache()
 settings = get_settings()
@@ -40,8 +41,10 @@ if "phase2_session_id" not in st.session_state:
     st.session_state.phase2_session_id = str(uuid4())
 if "phase3_session_id" not in st.session_state:
     st.session_state.phase3_session_id = str(uuid4())
+if "phase4_session_id" not in st.session_state:
+    st.session_state.phase4_session_id = str(uuid4())
 
-st.title("Agentic AI — retrieval + Phase 1, 2 & 3 agents")
+st.title("Agentic AI — retrieval + Phase 1–4 agents")
 
 
 def summarize(settings_obj: Settings) -> None:
@@ -68,11 +71,10 @@ def summarize(settings_obj: Settings) -> None:
 
 summarize(settings)
 
-st.markdown("### Shared knowledge corpus — Phase 1, 2 & 3")
+st.markdown("### Shared knowledge corpus — Phases 1–4")
 st.caption(
-    "Corpus-before-remote feeds Phase 1–3. Set ADC or GEMINI_API_KEY. Phase 3 needs the MCP fetch "
-    "server reachable via Docker (~`mcp/fetch`), **`uvx mcp-server-fetch`**, or `python -m "
-    "`mcp_server_fetch` — see MCP_FINANCIAL_* in `.env.example`."
+    "Corpus feeds Phases 1–4 (Phase 4 stacks critique-driven refinements atop Phase 3)."
+    " Set ADC or GEMINI_API_KEY. Phase 3 needs MCP fetch; see MCP_FINANCIAL_* in `.env.example`."
 )
 
 offline_embeddings = st.toggle(
@@ -121,12 +123,13 @@ if st.button("Ingest corpus", type="primary"):
 
 st.metric("Chunk count", corpus_shared.chunk_count)
 
-tab_lab, tab_p1, tab_p2, tab_p3 = st.tabs(
+tab_lab, tab_p1, tab_p2, tab_p3, tab_p4 = st.tabs(
     [
         "Instrumentation smoke · FAISS",
         "Phase 1 · Core RAG (ADK)",
         "Phase 2 · External knowledge (Hybrid)",
         "Phase 3 · MCP Yahoo finance",
+        "Phase 4 · Autonomous refinement",
     ],
 )
 
@@ -276,8 +279,81 @@ with tab_p3:
                     st.markdown(reply3 or _REPLY_FALLBACK_MARKDOWN)
 
 
+with tab_p4:
+    st.markdown(
+        "**Phase 4** runs **Phase‑3 hybrid research**, then asks Gemini — in a reviewer role — "
+        "to emit critique JSON (**gaps** + **follow_up_queries**). Unsatisfied passes launch "
+        "**additional research rounds** (same tools) toward a tightened answer."
+    )
+    st.caption(
+        "`max_critique_iterations` bounds how many **post-draft refinement cycles** may run "
+        "(each critiques the latest draft before optionally spinning another Phase‑3 invocation)."
+    )
+    question4 = st.text_input("Research question (with critique refinement)", "", key="phase4_q")
+    max_crit = st.number_input(
+        "Max critique-driven refinement iterations",
+        min_value=0,
+        max_value=6,
+        value=2,
+        step=1,
+        key="phase4_max_crit",
+        help="Each iteration critiques the newest draft then, if needed, researches again.",
+    )
+    ask4 = st.button(
+        "Run Phase 4 · Research + critique loops",
+        key="phase4_go",
+    )
+
+    if ask4:
+        if not question4.strip():
+            st.warning(_MSG_PROVIDE_QUESTION)
+        else:
+            with st.spinner("Running refinement loop (research + critiques) …"):
+                try:
+                    refined = run_phase4_refinement_loop_sync(
+                        settings=settings,
+                        corpus=corpus_shared,
+                        question=question4,
+                        max_critique_iterations=int(max_crit),
+                        user_id=st.session_state.get("core_user", "streamlit-operator"),
+                        session_id=st.session_state.phase4_session_id,
+                    )
+                except Exception as exc:
+                    st.error(f"Invocation failed — {exc!s}")
+                else:
+                    status = (
+                        "Critique satisfied reviewer."
+                        if refined.terminated_because_satisfied
+                        else "Stopped at iteration ceiling (still unsatisfied — inspect critiques)."
+                    )
+                    st.caption(status)
+                    st.markdown(refined.final_answer or _REPLY_FALLBACK_MARKDOWN)
+
+                    expand = st.expander(
+                        "Refinement trace (research rounds + critiques)", expanded=False
+                    )
+                    with expand:
+                        rounds = []
+                        for rec in refined.research_history:
+                            rounds.append(
+                                {"round_index": rec.round_index, "prompt_preview": rec.prompt[:400]}
+                            )
+                        st.json({"research_rounds": rounds})
+                        critiques_payload = []
+                        for cblock in refined.critiques:
+                            critiques_payload.append(
+                                {
+                                    "critique_index": cblock.critique_index,
+                                    "decision": cblock.critique.model_dump(mode="python"),
+                                    "raw_snippet": cblock.raw_critique_response[:2000],
+                                }
+                            )
+                        st.json({"critiques": critiques_payload})
+
+
 st.caption(
     "Phase 1 `app/agents/core_rag.py`; Phase 2 `app/agents/external_knowledge.py`; "
-    "Phase 3 `app/agents/phase3_mcp.py`; tools `app/tools/` (+ `app/mcp/` MCP client); corpus "
-    "`app/knowledge/store.py`."
+    "Phase 3 `app/agents/phase3_mcp.py`; Phase 4 `app/agents/refinement_loop.py`; tools "
+    "`app/tools/` + `app/mcp/` MCP client; corpus `app/knowledge/store.py`; runner facades "
+    "`app/agents/session_runner.py`."
 )
