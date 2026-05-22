@@ -45,6 +45,10 @@ Bring up the **standalone News Agent** (A2A REST on **:8090**) together with the
 docker compose --profile collaboration up --build rag-ui news-agent
 ```
 
+Requires an image **`ENTRYPOINT`** that lets Compose **`command`** run **bare `uvicorn`** for `news-agent` (see **`Dockerfile`**: empty `ENTRYPOINT`, Streamlit-only **`CMD`** for `rag-ui`). If **`news-agent` exits immediately**, run **`docker compose --profile collaboration ps`** — it must show **Up** or Phase 5 DNS to `news-agent` fails with **`Errno -2`**.
+
+**Phase 5 networking:** **`news-agent`** is a Compose **service DNS name**. The **`rag-ui`** container always delegates to **`http://news-agent:8090`** (see `docker-compose.yml`). If you run **`agentic-ai-ui` on the host** instead, set **`NEWS_AGENT_A2A_BASE_URL=http://localhost:8090`** in `.env` so the laptop can reach the published port. Set **`NEWS_AGENT_PUBLIC_BASE_URL=http://localhost:8090`** so the agent card matches how you call the service from the host.
+
 The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (toggle **offline embeddings** in Streamlit around the shared corpus). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. **Phase 3** runs the MCP fetch preset by spawning `python -m mcp_server_fetch`; the Dockerfile installs **`[phase3-fetch]`** extras and Compose defaults **`MCP_FINANCIAL_FETCH_TRANSPORT=python`**. Override with **`docker`** (host Docker) or **`uvx`** on bare metal instead. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
 
 Self-hosted Langfuse uses the official Compose blueprint (PostgreSQL + Redis + ClickHouse + MinIO)—see **[docs/langfuse-self-hosted.md](docs/langfuse-self-hosted.md)** and the upstream **[Langfuse Compose guide](https://langfuse.com/self-hosting/deployment/docker-compose)**.

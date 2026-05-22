@@ -14,4 +14,7 @@ RUN pip install --upgrade pip setuptools wheel \
 
 EXPOSE 8501 8090
 
-ENTRYPOINT ["streamlit", "run", "streamlit_app.py", "--server.address=0.0.0.0", "--browser.gatherUsageStats=false"]
+# No ENTRYPOINT: `docker compose` uses `command` for the News Agent (uvicorn). If we pin
+# `streamlit` as ENTRYPOINT, Compose args are appended to Streamlit and the A2A service exits.
+ENTRYPOINT []
+CMD ["streamlit", "run", "streamlit_app.py", "--server.address=0.0.0.0", "--browser.gatherUsageStats=false"]

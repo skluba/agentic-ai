@@ -52,5 +52,8 @@ services:
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
       MCP_FINANCIAL_FETCH_TRANSPORT: ${MCP_FINANCIAL_FETCH_TRANSPORT:-python}
       MCP_FINANCIAL_DOCKER_IMAGE: ${MCP_FINANCIAL_DOCKER_IMAGE:-mcp/fetch}
-      NEWS_AGENT_A2A_BASE_URL: ${NEWS_AGENT_A2A_BASE_URL:-http://news-agent:8090}
+      # Always reach the sibling Compose service via internal DNS — do **not** forward host
+      # `.env` `NEWS_AGENT_A2A_BASE_URL=http://localhost:8090` into this container or the
+      # orchestrator loops back to itself. Host-only Streamlit (no Docker UI) reads `.env` as usual.
+      NEWS_AGENT_A2A_BASE_URL: http://news-agent:8090
       NEWS_AGENT_HTTP_TIMEOUT_SECONDS: ${NEWS_AGENT_HTTP_TIMEOUT_SECONDS:-120}

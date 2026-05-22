@@ -20,7 +20,12 @@ from app.agents.session_runner import (  # noqa: E402
     run_phase3_mcp_turn_sync,
     run_phase5_collaborative_turn_sync,
 )
-from app.config import Settings, clear_settings_cache, get_settings  # noqa: E402
+from app.config import (  # noqa: E402
+    Settings,
+    clear_settings_cache,
+    get_settings,
+    news_agent_a2a_url_host_resolution_hint,
+)
 from app.knowledge import KnowledgeCorpus, build_embedder_from_settings  # noqa: E402
 from app.observability import flush_langfuse, langfuse_enabled  # noqa: E402
 from app.rag.lab_demo import run_streamlit_lab  # noqa: E402
@@ -365,10 +370,16 @@ with tab_p5:
         "briefing to the standalone News Agent (**REST · A2A HTTP+JSON**)."
     )
     st.caption(
-        "`docker compose profile collaboration` runs `news-agent` on `:8090`. "
-        "Set **`NEWS_AGENT_PUBLIC_BASE_URL`** there and **`NEWS_AGENT_A2A_BASE_URL`** here "
-        "(e.g. `http://news-agent:8090`)."
+        "**Compose (`rag-ui` + `news-agent`):** delegation URL is **`http://news-agent:8090`** "
+        "inside containers (wired in `docker-compose.yml`). **Host-only Streamlit** "
+        "(`agentic-ai-ui`): use **`http://localhost:8090`** — the hostname "
+        "**`news-agent`** does **not** resolve outside Compose."
+        " Set **`NEWS_AGENT_PUBLIC_BASE_URL`** so the standalone agent advertises "
+        "**`http://localhost:8090`** when you call it from your laptop."
     )
+    _phase5_dns_hint = news_agent_a2a_url_host_resolution_hint(settings)
+    if _phase5_dns_hint:
+        st.warning(_phase5_dns_hint)
     if not settings.news_agent_a2a_base_url.strip():
         st.warning(
             "Orchestrator has no NEWS_AGENT_A2A_BASE_URL — delegation tool omitted.\n\n"

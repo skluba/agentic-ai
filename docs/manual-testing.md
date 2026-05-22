@@ -40,7 +40,15 @@ docker compose --profile collaboration up --build rag-ui news-agent
 
 - UI: `http://localhost:8501` — open **Phase 5 · A2A collaborative news**.
 - News Agent health: `GET http://localhost:8090/.well-known/agent-card.json` with header `A2A-Version: 1.0` (expect JSON agent card).
-- Typical `.env`: `NEWS_AGENT_PUBLIC_BASE_URL=http://localhost:8090` and **`NEWS_AGENT_A2A_BASE_URL=http://localhost:8090`** when both services publish/map to localhost (Compose defaults bridge hostnames **`news-agent:8090`** inside the Compose network).
+- **Orchestrator URL:** `docker-compose.yml` sets **`NEWS_AGENT_A2A_BASE_URL=http://news-agent:8090`** for the **`rag-ui`** service (Compose internal DNS — do **not** set this to `localhost` inside the container).
+- **`NEWS_AGENT_PUBLIC_BASE_URL`** in `.env`: use **`http://localhost:8090`** when callers reach the standalone agent via the published host port.
+
+### Troubleshooting Phase 5
+
+| Symptom | Likely cause | Fix |
+|--------|----------------|-----|
+| `Network communication error ... news-agent ... [Errno -2] Name or service not known` | **A)** Streamlit on the **host** with **`NEWS_AGENT_A2A_BASE_URL=http://news-agent:8090`** — that hostname exists only on Compose DNS. **B)** **`news-agent` container is not Up** (often **Exited (2)**): the image used **`ENTRYPOINT streamlit`** while Compose passed **`uvicorn`**, so Uvicorn never bound to 8090 (fixed in current **`Dockerfile`**: empty `ENTRYPOINT`, Streamlit as **`CMD`** only). | **A)** **`NEWS_AGENT_A2A_BASE_URL=http://localhost:8090`** in `.env`; restart host Streamlit. **B)** Run **`docker compose --profile collaboration ps`** — **`news-agent`** must be **Up**. Rebuild: **`docker compose --profile collaboration build --no-cache news-agent`** then **`up -d`**; check logs: **`docker compose logs news-agent`** (expect Uvicorn listening, not Streamlit). |
+| Card fetch works from browser but delegation fails inside `rag-ui` | Rare: mis-typed **`NEWS_AGENT_A2A_BASE_URL`** overriding compose (should not occur — compose sets a literal). | Inspect **Active configuration** JSON in Streamlit; expect `news_agent_orchestrator_url` **`http://news-agent:8090`** when UI is Dockerized. |
 
 ## Tab-by-tab checklist
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 from app.config import (
@@ -10,6 +11,7 @@ from app.config import (
     clear_settings_cache,
     configure_google_genai_api_key_environment,
     get_settings,
+    news_agent_a2a_url_host_resolution_hint,
 )
 
 
@@ -74,3 +76,31 @@ def test_get_settings_kw_overrides_cached():
         assert custom.gcp_project_id == "tmp-local"
     finally:
         clear_settings_cache()
+
+
+def test_news_agent_a2a_host_resolution_hint_blank_url():
+    assert news_agent_a2a_url_host_resolution_hint(Settings(news_agent_a2a_base_url="")) is None
+
+
+def test_news_agent_a2a_host_resolution_hint_localhost_ok():
+    assert news_agent_a2a_url_host_resolution_hint(
+        Settings(news_agent_a2a_base_url="http://localhost:8090/")
+    ) is None
+
+
+def test_news_agent_a2a_host_resolution_warns_compose_dns_on_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Path, "exists", lambda self: False)
+    cfg = Settings(news_agent_a2a_base_url="http://news-agent:8090/")
+    hint = news_agent_a2a_url_host_resolution_hint(cfg)
+    assert hint is not None
+    assert "localhost:8090" in hint
+
+
+def test_news_agent_a2a_host_resolution_suppressed_inside_container(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Path, "exists", lambda self: str(self) == "/.dockerenv")
+    cfg = Settings(news_agent_a2a_base_url="http://news-agent:8090/")
+    assert news_agent_a2a_url_host_resolution_hint(cfg) is None
