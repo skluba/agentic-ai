@@ -1,0 +1,19 @@
+GRIDU NEWSROOM — Wire style stub (fictional, Phase 5 orchestrator corpus QA)
+Doc label suggestion: NEWSROOM-WIRE-2026-01
+
+Purpose
+These lines are tuned for Phase 5 runs where the **orchestrator** (Streamlit) still has your
+shared FAISS ingest, while the **standalone News Agent** process starts with an empty KB unless
+you add a separate ingestion path. Use this file to validate that Phase 5 reconciles **`PRIVATE_KB`**
+(or equivalent tags) with **`REMOTE_NEWS_AGENT`** briefing text when you ask for “headlines +
+internal policy”.
+
+STYLE RULES (INTERNAL)
+- Never claim a source “confirmed” a story unless the wire names the outlet and we have a date.
+- For ACME-adjacent stories, prepend the slug **[ACME-CHECK]** if the memo MEMO-2026-ORG-0421
+  mentions retention or customer-facing promises for the same topic.
+- Keep market tables delegated to MCP finance tooling; do not paste imaginary tickers here.
+
+HANDOFF NOTE
+When the remote News Agent returns only **`NEWS_AGENT · WEB`** bullets (empty KB server-side),
+the orchestrator should still tag that block **`REMOTE_NEWS_AGENT`** per Phase 5 instructions.

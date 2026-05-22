@@ -23,7 +23,7 @@ Canonical references:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install --upgrade pip
-pip install -e ".[dev,phase3-fetch]"
+pip install -e ".[dev,phase3-fetch,news-agent]"
 cp .env.example .env           # customise secrets / Langfuse URLs
 pytest --cov=app --cov-report=term-missing --cov-report=xml
 agentic-ai-ui                   # launches Streamlit on :8501
@@ -31,13 +31,25 @@ agentic-ai-ui                   # launches Streamlit on :8501
 
 ### Manual QA (Streamlit)
 
-Step-by-step questions and paste-ready corpora for Phases **1–4**: [`docs/manual-testing.md`](docs/manual-testing.md) and [`docs/examples/`](docs/examples/).
+Step-by-step questions and paste-ready corpora for Phases **1–5** (including **A2A News Agent**): [`docs/manual-testing.md`](docs/manual-testing.md) and [`docs/examples/`](docs/examples/).
 
 ### Containers
 
 ```bash
 docker compose up --build rag-ui        # exposes http://localhost:8501
 ```
+
+Bring up the **standalone News Agent** (A2A REST on **:8090**) together with the Streamlit UI:
+
+```bash
+docker compose --profile collaboration up --build rag-ui news-agent
+```
+
+Requires an image **`ENTRYPOINT`** that lets Compose **`command`** run **bare `uvicorn`** for `news-agent` (see **`Dockerfile`**: empty `ENTRYPOINT`, Streamlit-only **`CMD`** for `rag-ui`). If **`news-agent` exits immediately**, run **`docker compose --profile collaboration ps`** — it must show **Up** or Phase 5 DNS to `news-agent` fails with **`Errno -2`**.
+
+**Phase 5 networking:** The **`rag-ui`** orchestrator always uses **`http://news-agent:8090`** via compose. The **`news-agent`** service pins **`NEWS_AGENT_PUBLIC_BASE_URL=http://news-agent:8090`** so the agent-card JSON does not advertise **`localhost`** (which would make A2A follow-up calls from **`rag-ui`** hit the wrong socket). For **host-only** Streamlit (`agentic-ai-ui`), set **`NEWS_AGENT_A2A_BASE_URL=http://localhost:8090`** and **`NEWS_AGENT_PUBLIC_BASE_URL=http://localhost:8090`**.
+
+**Langfuse in `rag-ui`:** **`LANGFUSE_HOST=http://localhost:3000`** in `.env` points at the **`rag-ui`** container itself — use **`LANGFUSE_HOST=http://host.docker.internal:3000`** when Langfuse runs on the laptop (Docker Desktop), or omit **`LANGFUSE_*`** if you are not using it.
 
 The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (toggle **offline embeddings** in Streamlit around the shared corpus). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. **Phase 3** runs the MCP fetch preset by spawning `python -m mcp_server_fetch`; the Dockerfile installs **`[phase3-fetch]`** extras and Compose defaults **`MCP_FINANCIAL_FETCH_TRANSPORT=python`**. Override with **`docker`** (host Docker) or **`uvx`** on bare metal instead. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
 
@@ -63,6 +75,9 @@ EMBEDDING_DIMENSION=768                  # must match model output dims
 # Phase 3 — MCP fetch server transport (docker | uvx | python)
 # MCP_FINANCIAL_FETCH_TRANSPORT=docker
 # MCP_FINANCIAL_DOCKER_IMAGE=mcp/fetch
+
+# Phase 5 News Agent URLs — NEWS_AGENT_PUBLIC_BASE_URL (standalone) &
+# NEWS_AGENT_A2A_BASE_URL (orchestrator) — see `.env.example`
 ```
 
 ### Phase 1: Core RAG MVP
@@ -105,6 +120,16 @@ Helpers: **`run_phase3_mcp_turn_sync`** / **`run_phase3_mcp_turn`** in **`app/ag
 
 Exported from **`app/agents/__init__.py`** for parity with earlier phases (`RefinementLoopResult`).
 
+### Phase 5: Agent-to-Agent collaboration (News specialist)
+
+**Goal:** delegate digest-style briefings to a standalone **News Agent** over **[A2A](https://github.com/a2aproject/A2A)** REST (**HTTP+JSON**) — **`/.well-known/agent-card.json`**, **`/message:send`**.
+
+1. **News worker** — `app/agents/news_focused.py` + **`app/a2a/`** (Starlette `news_starlette_app.py`, **`news_service`** uvicorn factory).
+2. **A2A client tool** — `app/tools/news_agent_client.py`, **`news_agent_a2a_tool.py`** (**`NEWS_AGENT_A2A_BASE_URL`**).
+3. **Planner** — **`app/agents/phase5_collaborative.py`** extends Phase 3 (news timelines vs MCP Yahoo mover tables).
+
+Compose profile **`collaboration`** starts **`news-agent`** on `:8090`. Helpers **`run_phase5_collaborative_turn_sync`**.
+
 ---
 
 ## QA + SonarCloud
@@ -130,17 +155,22 @@ app/agents/core_rag.py      # Phase 1 Plan/Execute/Synthesize + document tool
 app/agents/external_knowledge.py # Phase 2 hybrid planner + corpus + Google Search grounding
 app/agents/phase3_mcp.py    # Phase 3 corpus + MCP Yahoo + Google Search routing
 app/agents/refinement_loop.py # Phase 4 critique + iterative Phase-3 replans
+app/agents/news_focused.py  # standalone News KB + web agent backing A2A
+app/agents/phase5_collaborative.py # Phase 3 + delegated News briefing
 app/agents/session_runner.py
+app/a2a/                    # A2A Starlette app + executor + uvicorn wiring
 app/tools/document_search_tool.py
 app/tools/financial_markets_mcp_tool.py
 app/tools/google_search_tool.py
+app/tools/news_agent_client.py # HTTP+JSON A2A outbound client helpers
+app/tools/news_agent_a2a_tool.py
 app/mcp/                    # stdio MCP client + fetch batching helpers
 app/rag/faiss_store.py      # deterministic in-memory retrieval slice (lab demo)
 app/rag/lab_demo.py         # hierarchical @observe (chain + retriever spans)
 app/observability/          # Langfuse helpers + flush for scripts / Streamlit
-streamlit_app.py            # Loads `.env`; smoke + Phase 1–4 tabs
+streamlit_app.py            # Loads `.env`; smoke + Phase 1–5 tabs
 .cursor/skills/langfuse/    # upstream Langfuse agent skill (+ references/)
-infra / docs forthcoming    # richer ADK graphs + A2A wiring live here next
+infra / docs forthcoming    # richer ADK graphs stay here next
 ```
 
 ## License

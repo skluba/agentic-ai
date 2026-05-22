@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -66,6 +68,33 @@ class Settings(BaseSettings):
         description="Docker image for MCP fetch when transport=docker.",
     )
 
+    news_agent_a2a_base_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEWS_AGENT_A2A_BASE_URL", "NEWS_AGENT_URL"),
+        description=(
+            "Base HTTP URL reachable by the orchestrator for the standalone News Agent A2A card."
+        ),
+    )
+    news_agent_public_base_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEWS_AGENT_PUBLIC_BASE_URL"),
+        description=(
+            "Public URL echoed in /.well-known; must equal the REST base callers use to reach it."
+        ),
+    )
+    news_agent_use_offline_embeddings: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("NEWS_AGENT_USE_OFFLINE_EMBEDDINGS"),
+        description="Deterministic embeddings for the News Agent process (offline toggle).",
+    )
+    news_agent_http_timeout_seconds: float = Field(
+        default=120.0,
+        ge=5.0,
+        le=900.0,
+        validation_alias=AliasChoices("NEWS_AGENT_HTTP_TIMEOUT_SECONDS"),
+        description="HTTP timeout seconds for outbound A2A tooling from the orchestrator.",
+    )
+
 
 @lru_cache
 def get_settings(**overrides: Any) -> Settings:
@@ -78,6 +107,42 @@ def get_settings(**overrides: Any) -> Settings:
 def clear_settings_cache() -> None:
     """Drop cached Settings (tests)."""
     get_settings.cache_clear()
+
+
+def news_agent_a2a_url_host_resolution_hint(settings: Settings) -> str | None:
+    """Explain common DNS failure when NEWS_AGENT_* uses Compose service hostname on host.
+
+    Errno (-2 name not known / getaddrinfo) happens when Streamlit runs on the laptop while
+    ``NEWS_AGENT_A2A_BASE_URL`` points at ``http://news-agent:8090`` — that hostname exists only on
+    Docker's embedded DNS for sibling containers.
+
+    Detection uses ``/.dockerenv`` — enough for Compose / typical cloud images; obscure container
+    runtimes might omit it, in which case we simply skip this hint.
+
+    Args:
+        settings: Active Settings for the orchestrator process.
+
+    Returns:
+        Markdown-safe message for Streamlit/help text, or None if no heuristic applies.
+    """
+    raw = (settings.news_agent_a2a_base_url or "").strip()
+    if not raw:
+        return None
+    try:
+        hostname = (urlparse(raw).hostname or "").lower()
+    except ValueError:
+        return None
+    if hostname != "news-agent":
+        return None
+    if Path("/.dockerenv").exists():
+        return None
+    return (
+        "`NEWS_AGENT_A2A_BASE_URL` uses hostname `news-agent`, which resolves only "
+        "**inside Docker Compose** (the internal DNS name for the `news-agent` service). "
+        "This Streamlit process is running on the **host** — use "
+        "**`NEWS_AGENT_A2A_BASE_URL=http://localhost:8090`** in `.env` (ensure the Compose "
+        "service publishes **`8090:8090`**), save, and restart Streamlit."
+    )
 
 
 def configure_google_genai_api_key_environment(settings: Settings) -> None:

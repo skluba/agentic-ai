@@ -1,4 +1,36 @@
 services:
+  news-agent:
+    profiles:
+      - collaboration
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - uvicorn
+      - app.a2a.news_service:uvicorn_news_application_factory
+      - --factory
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8090"
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
+    environment:
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-gd-gcp-gridu-genai}
+      VERTEX_LOCATION: ${VERTEX_LOCATION:-europe-west4}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-004}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
+      # Card JSON lists this REST base — must match callers on the Compose network (see rag-ui fix).
+      # Host only .env `http://localhost:8090` breaks follow-up HTTP from rag-ui ("connection failed").
+      NEWS_AGENT_PUBLIC_BASE_URL: http://news-agent:8090
+      NEWS_AGENT_USE_OFFLINE_EMBEDDINGS: ${NEWS_AGENT_USE_OFFLINE_EMBEDDINGS:-true}
+
   rag-ui:
     build:
       context: .
@@ -19,6 +51,13 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-004}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
+      # Langfuse on the host cannot be reached as http://localhost:3000 inside this container.
+      # Prefer LANGFUSE_HOST=http://host.docker.internal:3000 (Docker Desktop) or unset LANGFUSE_* here.
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
       MCP_FINANCIAL_FETCH_TRANSPORT: ${MCP_FINANCIAL_FETCH_TRANSPORT:-python}
       MCP_FINANCIAL_DOCKER_IMAGE: ${MCP_FINANCIAL_DOCKER_IMAGE:-mcp/fetch}
+      # Always reach the sibling Compose service via internal DNS — do **not** forward host
+      # `.env` `NEWS_AGENT_A2A_BASE_URL=http://localhost:8090` into this container or the
+      # orchestrator loops back to itself. Host-only Streamlit (no Docker UI) reads `.env` as usual.
+      NEWS_AGENT_A2A_BASE_URL: http://news-agent:8090
+      NEWS_AGENT_HTTP_TIMEOUT_SECONDS: ${NEWS_AGENT_HTTP_TIMEOUT_SECONDS:-120}
