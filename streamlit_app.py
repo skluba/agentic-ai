@@ -194,8 +194,9 @@ with tab_p1:
 
 with tab_p2:
     st.markdown(
-        "**Phase 2** attaches hosted Google Search next to corpus snippets ingested above. "
-        "The prompt steers corpus vs web; **`PRIVATE_KB`** vs **`WEB`** labels unify answers."
+        "**Phase 2** treats uploads as canonical evidence.\n"
+        "Host Search fills gaps/recency/external-only facts.\n\n"
+        "With chunks loaded, **`search_private_knowledge`** precedes web."
     )
     st.caption(
         "Hosted search may depend on SKU/entitlements. Hybrid mode installs grounding even without "

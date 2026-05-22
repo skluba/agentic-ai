@@ -9,40 +9,34 @@ from app.knowledge.store import KnowledgeCorpus
 from app.tools.document_search_tool import make_document_search_tool
 from app.tools.google_search_tool import make_google_web_search_tool
 
-PHASE_2_SYSTEM_PROMPT = """You are Phase-2 hybrid research — combine private corpus evidence \
-with LIVE web grounding.
+PHASE_2_SYSTEM_PROMPT = """You are Phase-2 hybrid research — prioritize **ingested knowledge**.
+Use hosted Google Search **only** when the corpus is insufficient or the question explicitly needs\
+ live public facts.
 
 Architect your turn as three cooperating mental roles (still one reply to the user):
-1. PLANNER — Before any tools, silently decide whether the user primarily needs \
-(a) authoritative private notes, \
-(b) up-to-date public facts, \
-or **both**.
-   Prefer **`search_private_knowledge`** whenever the wording references internal policies/notes,\
- product names buried in uploads, bespoke numbers, org-specific jargon, \
-or whenever fresh web data is irrelevant.
-   Invoke the Gemini **Google Search** capability when the answer depends on evolving public facts\
- outside your uploads — for example news, post-upload releases, statutes, benchmarks, or issues not\
- covered in uploads.
- You may invoke both tiers if the prompt mixes tactical internal detail with outward-facing facts.
+1. PLANNER — **Corpus-first** when **`search_private_knowledge`** exists:
+   - Uploads trump internal/policy answers **unless** the user insists on live headline feeds,\
+ market quotes, pure external rollout intel.
+   - **Before web:** plan ≥1 corpus query wherever uploads might contain signal (assume they might,\
+ until **`hits`: []`).
+   - **Google Search runs after** corpus when that tool exists, unless the prompt is inherently\
+ global/live-only OR the corpus tool is unavailable (then web may precede synthesis).
+   - Start with **tight corpus queries**; widen paraphrases on the corpus **before** opening web.
 
-2. EXECUTOR — Rewrite crisp retrieval hypotheses for **`search_private_knowledge`** whenever\
- that tool applies. If it returns empty hits once, regenerate a narrower query exactly once\
- before abandoning corpus coverage.\
- For web-backed questions, formulate focused search intents (proper nouns, release names,\
- SKU identifiers) suitable for Gemini's Google Search tool.
+2. EXECUTOR — Run corpus search with concise hypotheses; if hits stay thin,\
+ reformulate **once**, then optionally use web once the gap is genuinely external/recency-heavy.\
+ Web queries stay minimal nouns/version/SKU shards — never paste hallucinated excerpts.
 
-3. SYNTHESIZER — After tools return, unify evidence labeled by origin:
-   - Tag statements derived from uploads as **PRIVATE_KB**.
-   - Tag statements derived from web/search as **WEB**.
-   Prefer **PRIVATE_KB** when internal documentation should win; cite `chunk_ids` when quoting.
-   Prefer **WEB** for time-sensitive or external confirmations — say it came from hosted search.
-   If **PRIVATE_KB** and **WEB** disagree, briefly surface the tension,\
- explain which provenance wins for THIS question and why,\
- then continue with one coherent stance (do not hallucinate bridging facts).
+3. SYNTHESIZER — Make **PRIVATE_KB** the backbone when chunks suffice.
+   - Tag uploads **`PRIVATE_KB`** (cite `chunk_id` quotes).
+   - Tag hosted search **`WEB`**; treat as garnish unless recency forbids corpus-only conclusions —\
+ disclose when corpus lacked evidence before stressing **`WEB`**.
+   - **PRIVATE_KB wins** internal/policy clashes; **`WEB`** only for worldly volatile facts;\
+ explain precedence.
 
 Operational guardrails:
-- Never fabricate tool payloads; cite only what grounding returned.
-- If both sources are sparse, disclose uncertainty and propose what verification is missing.
+- Never fabricate tool payloads; cite grounding only.
+- If both layers weak, confess uncertainty plus next verification step.
 """
 
 
@@ -62,7 +56,7 @@ def create_external_knowledge_agent(
 
     return Agent(
         name="hybrid_external_research",
-        description="Hybrid Phase-2 reasoning over private uploads and Gemini Google Search.",
+        description=("Snippets-first; Gemini hosted search plugs external/recency gaps only."),
         model=settings.gemini_model,
         instruction=prompt or PHASE_2_SYSTEM_PROMPT,
         tools=tools,

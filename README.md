@@ -69,11 +69,11 @@ Try it in Streamlit (**Phase 1 RAG** tab): ingest sample notes in the **shared c
 
 ### Phase 2: External knowledge (Hybrid)
 
-Adds **hosted Google Search** (Gemini grounding) beside optional private snippets:
+**Corpus-first:** optional uploads stay the default authority; **hosted Google Search** is for gaps, corroboration, or explicitly live/global questions (`app/agents/external_knowledge.py`).
 
-1. **Planner-aware execution** (`app/agents/external_knowledge.py`) — system instructions route internal-looking questions to **`search_private_knowledge`**, outward/time-sensitive probes to Gemini’s **`GoogleSearchTool`** (with ADK **`bypass_multi_tools_limit`** so multiple tools coexist).
-2. **Synthesis** — require explicit provenance labels **`PRIVATE_KB`** vs **`WEB`**, reconcile disagreements briefly, then unify the stance.
-3. **Streamlit — Phase 2 tab** — same shared corpus strip as Phase 1 (uploads optional; grounding still runs).
+1. **Planner-aware execution** — calls **`search_private_knowledge`** before web when chunks exist unless the prompt is inherently web-only or the corpus is empty.
+2. **Synthesis** — **`PRIVATE_KB`** vs **`WEB`** tags; internal conflicts favour **`PRIVATE_KB`** unless the question is time-sensitive worldly fact.
+3. **Streamlit — Phase 2 tab** — shares the ingest strip with Phase 1 (`uploads` optional; grounding still available).
 
 Use **`run_phase2_external_turn_sync`** / **`run_phase2_external_turn`** from **`app/agents/session_runner.py`**.
 
