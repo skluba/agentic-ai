@@ -51,7 +51,7 @@ Requires an image **`ENTRYPOINT`** that lets Compose **`command`** run **bare `u
 
 **Langfuse in `rag-ui`:** **`LANGFUSE_HOST=http://localhost:3000`** in `.env` points at the **`rag-ui`** container itself — use **`LANGFUSE_HOST=http://host.docker.internal:3000`** when Langfuse runs on the laptop (Docker Desktop), or omit **`LANGFUSE_*`** if you are not using it.
 
-The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (toggle **offline embeddings** in Streamlit around the shared corpus). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. **Phase 3** runs the MCP fetch preset by spawning `python -m mcp_server_fetch`; the Dockerfile installs **`[phase3-fetch]`** extras and Compose defaults **`MCP_FINANCIAL_FETCH_TRANSPORT=python`**. Override with **`docker`** (host Docker) or **`uvx`** on bare metal instead. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
+The Compose file mounts **`${HOME}/.config/gcloud` → `/root/.config/gcloud` (read-only)** so **`application_default_credentials.json`** from `gcloud auth application-default login` works inside the container for Vertex Gemini and embeddings (toggle **offline embeddings** in Streamlit around the shared corpus). For the **Gemini Developer API**, set **`GEMINI_API_KEY`** in `.env` (or **`GOOGLE_API_KEY`**) instead; Compose passes **`GEMINI_API_KEY`** through. **Phase 3** Yahoo MCP fetch always uses **`MCP_FINANCIAL_FETCH_TRANSPORT=python`** in **`rag-ui`** (`python -m mcp_server_fetch`; the image installs **`[phase3-fetch]`**). Host `.env` values like **`docker`** would try to run the Docker CLI inside the container and fail—Compose overrides that pin. Override only via a Compose override file / custom image if you truly need **`docker`** or **`uvx`** inside **`rag-ui`**. If mounting ADC is not desired, set **`GOOGLE_APPLICATION_CREDENTIALS`** to a service-account JSON mounted or copied into the image instead.
 
 Self-hosted Langfuse uses the official Compose blueprint (PostgreSQL + Redis + ClickHouse + MinIO)—see **[docs/langfuse-self-hosted.md](docs/langfuse-self-hosted.md)** and the upstream **[Langfuse Compose guide](https://langfuse.com/self-hosting/deployment/docker-compose)**.
 
@@ -72,7 +72,8 @@ LANGFUSE_SECRET_KEY=sk-lf-...
 EMBEDDING_MODEL=text-embedding-004       # Vertex text embeddings
 EMBEDDING_DIMENSION=768                  # must match model output dims
 
-# Phase 3 — MCP fetch server transport (docker | uvx | python)
+# Phase 3 — MCP fetch server transport (docker | uvx | python; default **`python`** in code)
+# MCP_FINANCIAL_FETCH_TRANSPORT=python
 # MCP_FINANCIAL_FETCH_TRANSPORT=docker
 # MCP_FINANCIAL_DOCKER_IMAGE=mcp/fetch
 
@@ -104,7 +105,7 @@ Use **`run_phase2_external_turn_sync`** / **`run_phase2_external_turn`** from **
 
 **Goal:** retrieve **structured** HTML→markdown via the [reference MCP fetch server](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) and route finance questions away from generic web search when MCP data is usable.
 
-1. **MCP server** — local dev defaults: **`docker run -i --rm mcp/fetch`**, **`uvx mcp-server-fetch`**, or **`python -m mcp_server_fetch`** (`pip install ".[phase3-fetch]"`). See **`MCP_FINANCIAL_*`** env vars.
+1. **MCP server** — default **`python -m mcp_server_fetch`** (`pip install ".[phase3-fetch]"`; Docker image bundles it). **`docker`** or **`uvx`** modes work when Streamlit runs **on the host** with those CLIs. **`docker compose rag-ui`** pins **`python`** because the slim image has no Docker client. Configure via **`MCP_FINANCIAL_*`**.
 2. **Financial tool** — **`fetch_yahoo_finance_markets_via_mcp`** (`app/tools/financial_markets_mcp_tool.py`) calls MCP `fetch` for the fixed Yahoo URLs: **most-active stocks**, **crypto markets**, **currencies**.
 3. **Planner** — optional corpus-first; use MCP for equities/crypto/FX intents; hosted **Google Search** for general research or finance fallbacks (`app/agents/phase3_mcp.py`).
 

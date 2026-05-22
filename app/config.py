@@ -52,14 +52,14 @@ class Settings(BaseSettings):
     langfuse_host: str | None = Field(default=None, validation_alias="LANGFUSE_HOST")
 
     mcp_financial_fetch_transport: Literal["docker", "uvx", "python"] = Field(
-        default="docker",
+        default="python",
         validation_alias=AliasChoices(
             "MCP_FINANCIAL_FETCH_TRANSPORT",
             "PHASE3_MCP_FETCH_TRANSPORT",
         ),
         description=(
-            "Launch mcp-server-fetch via Docker, uvx, or python -m (requires pip "
-            "`mcp-server-fetch` when using python)."
+            "Launch mcp-server-fetch via python -m (default, matches Docker image extras), Docker "
+            "CLI, or uvx. Use docker only when ``docker`` is on PATH and daemon is reachable."
         ),
     )
     mcp_financial_docker_image: str = Field(

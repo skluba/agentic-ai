@@ -9,7 +9,7 @@ Use this playbook to exercise **Phase 1–5** tabs in [`streamlit_app.py`](../st
 | Python env from repo root | `pip install -e ".[dev,phase3-fetch,news-agent]"` ([README](../README.md)) |
 | Gemini / Vertex | Phases **1**, **2**, **4**, **5**: Application Default Credentials and `GOOGLE_CLOUD_PROJECT` + region. Optional `GEMINI_API_KEY` fallback. |
 | Langfuse keys (optional) | Tracing on **Instrumentation**. For **`rag-ui` in Docker**, **`LANGFUSE_HOST=http://localhost:3000`** hits the container — use **`http://host.docker.internal:3000`** if Langfuse runs on the host (Docker Desktop), or omit keys. |
-| **Phase 3** | Finance MCP demo expects the Yahoo MCP fetch path per [README](../README.md). Without it, expect tool errors (not app crashes). |
+| **Phase 3** | Yahoo MCP **`fetch`** (see [README](../README.md)). **`rag-ui`** Compose pins **`python -m`**; host `.env` **`docker`** is ignored there. |
 | **Phase 5** | Standalone **News Agent** on **:8090**; **`docker compose`** collaboration profile pins internal URLs (see [`.env.example`](../.env.example)). |
 
 ## Two-process caveat (Phase 5 corpus)

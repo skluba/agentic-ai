@@ -54,7 +54,8 @@ services:
       # Langfuse on the host cannot be reached as http://localhost:3000 inside this container.
       # Prefer LANGFUSE_HOST=http://host.docker.internal:3000 (Docker Desktop) or unset LANGFUSE_* here.
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
-      MCP_FINANCIAL_FETCH_TRANSPORT: ${MCP_FINANCIAL_FETCH_TRANSPORT:-python}
+      # Pin `python`; host `.env` often sets `docker` but the image has no Docker CLI (spawn fails).
+      MCP_FINANCIAL_FETCH_TRANSPORT: python
       MCP_FINANCIAL_DOCKER_IMAGE: ${MCP_FINANCIAL_DOCKER_IMAGE:-mcp/fetch}
       # Always reach the sibling Compose service via internal DNS — do **not** forward host
       # `.env` `NEWS_AGENT_A2A_BASE_URL=http://localhost:8090` into this container or the
