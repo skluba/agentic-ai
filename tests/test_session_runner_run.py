@@ -28,7 +28,6 @@ def test_user_turn_blank_becomes_empty_string():
     blank = session_runner._user_turn("   \t  ")
     assert blank.parts[0].text == ""
 
-
     evt = MagicMock()
     evt.author = "model"
     evt.content = types.Content(role="model", parts=[types.Part(text=None)])
