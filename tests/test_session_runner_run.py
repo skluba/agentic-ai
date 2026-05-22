@@ -12,6 +12,8 @@ from app.agents.session_runner import (
     run_core_rag_turn_sync,
     run_phase2_external_turn,
     run_phase2_external_turn_sync,
+    run_phase3_mcp_turn,
+    run_phase3_mcp_turn_sync,
 )
 from app.config import Settings
 from app.knowledge import FakeEmbeddingBackend, KnowledgeCorpus
@@ -126,6 +128,49 @@ def test_run_phase2_external_turn_sync_delegates():
 
     with patch("asyncio.run", return_value=sentinel) as mocked:
         out = run_phase2_external_turn_sync(**kwargs)
+
+    mocked.assert_called_once()
+    assert out == sentinel
+
+
+def test_run_phase3_mcp_turn_mocked_runner_yields_text():
+    empty_corpus = KnowledgeCorpus(FakeEmbeddingBackend(embedding_dim=12))
+    settings = Settings(gcp_project_id="phase3-runner-test")
+
+    evt = MagicMock()
+    evt.author = "phase3_mcp_hybrid"
+    evt.content = types.Content(role="model", parts=[types.Part(text="phase3 synthesized")])
+
+    mock_runner_inst = MagicMock()
+
+    async def fake_run_phase3(**_kwargs):  # noqa: ANN003
+        yield evt
+
+    mock_runner_inst.run_async = fake_run_phase3
+
+    async def body() -> tuple[str, list]:
+        with patch("app.agents.session_runner.Runner", return_value=mock_runner_inst):
+            return await run_phase3_mcp_turn(
+                settings=settings,
+                corpus=empty_corpus,
+                question="  EUR USD  ",
+            )
+
+    text_out, collected = asyncio.run(body())
+    assert text_out == "phase3 synthesized"
+    assert collected == [evt]
+
+
+def test_run_phase3_mcp_turn_sync_delegates():
+    sentinel: tuple[str, list] = ("p3-ok", [])
+    kwargs = {
+        "settings": Settings(gcp_project_id="phase3-sync"),
+        "corpus": KnowledgeCorpus(FakeEmbeddingBackend(8)),
+        "question": "btc movers?",
+    }
+
+    with patch("asyncio.run", return_value=sentinel) as mocked:
+        out = run_phase3_mcp_turn_sync(**kwargs)
 
     mocked.assert_called_once()
     assert out == sentinel

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -48,6 +48,23 @@ class Settings(BaseSettings):
     langfuse_public_key: str | None = Field(default=None, validation_alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str | None = Field(default=None, validation_alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str | None = Field(default=None, validation_alias="LANGFUSE_HOST")
+
+    mcp_financial_fetch_transport: Literal["docker", "uvx", "python"] = Field(
+        default="docker",
+        validation_alias=AliasChoices(
+            "MCP_FINANCIAL_FETCH_TRANSPORT",
+            "PHASE3_MCP_FETCH_TRANSPORT",
+        ),
+        description=(
+            "Launch mcp-server-fetch via Docker, uvx, or python -m (requires pip "
+            "`mcp-server-fetch` when using python)."
+        ),
+    )
+    mcp_financial_docker_image: str = Field(
+        default="mcp/fetch",
+        validation_alias="MCP_FINANCIAL_DOCKER_IMAGE",
+        description="Docker image for MCP fetch when transport=docker.",
+    )
 
 
 @lru_cache

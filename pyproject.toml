@@ -21,6 +21,7 @@ dependencies = [
   "pydantic>=2,<3",
   "pydantic-settings>=2,<3",
   "python-dotenv>=1,<2",
+  "mcp>=1.6,<2",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +29,9 @@ dev = [
   "pytest>=8,<9",
   "pytest-cov>=5,<6",
   "ruff>=0.14",
+]
+phase3-fetch = [
+  "mcp-server-fetch>=2025.1,<2026",
 ]
 
 [project.scripts]
