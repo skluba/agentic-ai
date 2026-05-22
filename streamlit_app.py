@@ -262,8 +262,11 @@ with tab_p3:
         "covers non-finance intents and backs up when MCP yields nothing usable."
     )
     st.caption(
-        "`docker pull mcp/fetch` (recommended per upstream docs) **or** `uvx mcp-server-fetch`; "
-        "override with `MCP_FINANCIAL_FETCH_TRANSPORT` / image in `.env`."
+        "**Default (`python`):** bundled **`python -m mcp_server_fetch`** (`[phase3-fetch]`). "
+        "`docker compose rag-ui` pins **`MCP_FINANCIAL_FETCH_TRANSPORT=python`** "
+        "(slim image has no Docker CLI). "
+        "Host Streamlit may use **`docker`**, **`uvx`**, or **`python`** "
+        "(see **`README`**, **`MCP_FINANCIAL_*`**)."
     )
     question3 = st.text_input("Hybrid + finance question", "", key="phase3_q")
     ask3 = st.button(

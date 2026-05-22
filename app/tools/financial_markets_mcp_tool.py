@@ -7,7 +7,7 @@ from typing import Literal
 
 from app.config import Settings
 from app.mcp.fetch_client import fetch_keyed_urls_via_mcp
-from app.mcp.stdio_params import stdio_parameters_for_fetch_server
+from app.mcp.stdio_params import stdio_parameters_for_fetch_server, stdio_python_mcp_fetch_server
 
 # Hard-coded retail finance endpoints (assignment spec).
 YAHOO_FINANCE_MCP_PAGES: dict[str, str] = {
@@ -52,11 +52,26 @@ def make_financial_markets_mcp_tool(settings: Settings):
                 keyed,
                 max_length_per_url=bounded,
             )
-        except OSError as exc:
-            return json.dumps(
-                {"ok": False, "error": f"spawn_failed:{exc}", "segments": segments},
-                ensure_ascii=False,
-            )
+        except OSError as docker_os_exc:
+            if settings.mcp_financial_fetch_transport != "docker":
+                return json.dumps(
+                    {"ok": False, "error": f"spawn_failed:{docker_os_exc}", "segments": segments},
+                    ensure_ascii=False,
+                )
+            # Common in `rag-ui` image: `.env` says docker but `/usr/local/bin/docker` is absent —
+            # fall back to the bundled `python -m mcp_server_fetch` session.
+            try:
+                payloads = await fetch_keyed_urls_via_mcp(
+                    stdio_python_mcp_fetch_server(),
+                    keyed,
+                    max_length_per_url=bounded,
+                )
+            except OSError as py_exc:
+                err_parts = f"spawn_failed:docker_fallback_python:{docker_os_exc!s}|{py_exc!s}"
+                return json.dumps(
+                    {"ok": False, "error": err_parts, "segments": segments},
+                    ensure_ascii=False,
+                )
         except Exception as exc:  # noqa: BLE001 — surface to model for fallback
             return json.dumps(
                 {"ok": False, "error": str(exc), "segments": segments},

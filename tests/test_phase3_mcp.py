@@ -92,6 +92,54 @@ def test_phase3_with_corpus_adds_documents():
     assert isinstance(builtin, GoogleSearchTool)
 
 
+async def failing_then_ok_fetch(server, keyed, **_kwargs):  # noqa: ANN001
+    if server.command == "docker":
+        raise OSError(2, "No such file or directory — docker binary missing")
+    await asyncio.sleep(0)
+    return {k: {"ok": True, "markdown": f"# {k} ok"} for k in keyed}
+
+
+def test_financial_tool_falls_back_to_python_transport_when_docker_spawn_fails():
+    """Docker transport from `.env` + missing `docker` binary (Compose image) retries python -m."""
+    settings = Settings(gcp_project_id="phase3-fallback", mcp_financial_fetch_transport="docker")
+
+    async def run_tool() -> str:
+        from app.tools.financial_markets_mcp_tool import make_financial_markets_mcp_tool
+
+        fn = make_financial_markets_mcp_tool(settings)
+        with patch(
+            "app.tools.financial_markets_mcp_tool.fetch_keyed_urls_via_mcp",
+            side_effect=failing_then_ok_fetch,
+        ):
+            return await fn(segments="stocks", max_length_per_url=4000)
+
+    raw = asyncio.run(run_tool())
+    decoded = json.loads(raw)
+    assert decoded["ok"] is True
+    assert decoded["mcp_fetch_by_source"]["us_stocks_most_active"]["markdown"]
+
+
+def test_financial_tool_docker_fallback_fails_serializes_both_oserrors():
+    settings = Settings(gcp_project_id="phase3-db", mcp_financial_fetch_transport="docker")
+
+    async def always_boom(*_a, **_kw):  # noqa: ANN001
+        raise OSError(2, "missing")
+
+    async def run_tool() -> str:
+        from app.tools.financial_markets_mcp_tool import make_financial_markets_mcp_tool
+
+        fn = make_financial_markets_mcp_tool(settings)
+        with patch(
+            "app.tools.financial_markets_mcp_tool.fetch_keyed_urls_via_mcp",
+            side_effect=always_boom,
+        ):
+            return await fn(segments="stocks")
+
+    decoded = json.loads(asyncio.run(run_tool()))
+    assert decoded["ok"] is False
+    assert "docker_fallback_python" in decoded["error"]
+
+
 def test_financial_tool_serializes_spawn_oserror_json():
     settings = Settings(gcp_project_id="phase3-os")
 

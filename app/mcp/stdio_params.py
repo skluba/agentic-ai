@@ -9,6 +9,11 @@ from mcp.client.stdio import StdioServerParameters
 from app.config import Settings
 
 
+def stdio_python_mcp_fetch_server() -> StdioServerParameters:
+    """Spawn MCP fetch via ``python -m mcp_server_fetch`` (bundled interpreter)."""
+    return StdioServerParameters(command=sys.executable, args=["-m", "mcp_server_fetch"])
+
+
 def stdio_parameters_for_fetch_server(settings: Settings) -> StdioServerParameters:
     """How to spawn the reference **mcp-server-fetch** (Docker, uvx, or ``python -m``).
 
@@ -20,5 +25,4 @@ def stdio_parameters_for_fetch_server(settings: Settings) -> StdioServerParamete
         return StdioServerParameters(command="docker", args=["run", "-i", "--rm", image])
     if transport == "uvx":
         return StdioServerParameters(command="uvx", args=["mcp-server-fetch"])
-    # python module (requires optional ``mcp-server-fetch`` pip package)
-    return StdioServerParameters(command=sys.executable, args=["-m", "mcp_server_fetch"])
+    return stdio_python_mcp_fetch_server()
