@@ -5,17 +5,29 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import MagicMock, patch
 
+from app.agents import session_runner
 from app.agents.session_runner import (
     concatenate_agent_text,
     run_core_rag_turn,
     run_core_rag_turn_sync,
+    run_phase2_external_turn,
+    run_phase2_external_turn_sync,
 )
 from app.config import Settings
 from app.knowledge import FakeEmbeddingBackend, KnowledgeCorpus
 from google.genai import types
 
 
-def test_concatenate_skips_blank_text_parts():
+def test_user_turn_strips_whitespace():
+    content = session_runner._user_turn("  hello world  \n")
+    assert content.role == "user"
+    assert content.parts[0].text == "hello world"
+
+
+def test_user_turn_blank_becomes_empty_string():
+    blank = session_runner._user_turn("   \t  ")
+    assert blank.parts[0].text == ""
+
     evt = MagicMock()
     evt.author = "model"
     evt.content = types.Content(role="model", parts=[types.Part(text=None)])
@@ -71,6 +83,49 @@ def test_run_core_rag_turn_sync_delegates_to_asyncio_run():
 
     with patch("asyncio.run", return_value=sentinel) as mocked:
         out = run_core_rag_turn_sync(**kwargs)
+
+    mocked.assert_called_once()
+    assert out == sentinel
+
+
+def test_run_phase2_external_turn_mocked_runner_yields_text():
+    empty_corpus = KnowledgeCorpus(FakeEmbeddingBackend(embedding_dim=12))
+    settings = Settings(gcp_project_id="phase2-runner-test")
+
+    evt = MagicMock()
+    evt.author = "hybrid_external_research"
+    evt.content = types.Content(role="model", parts=[types.Part(text="phase2 synthesized")])
+
+    mock_runner_inst = MagicMock()
+
+    async def fake_run_phase2(**_kwargs):  # noqa: ANN003
+        yield evt
+
+    mock_runner_inst.run_async = fake_run_phase2
+
+    async def body() -> tuple[str, list]:
+        with patch("app.agents.session_runner.Runner", return_value=mock_runner_inst):
+            return await run_phase2_external_turn(
+                settings=settings,
+                corpus=empty_corpus,
+                question="  q2  ",
+            )
+
+    text_out, collected = asyncio.run(body())
+    assert text_out == "phase2 synthesized"
+    assert collected == [evt]
+
+
+def test_run_phase2_external_turn_sync_delegates():
+    sentinel: tuple[str, list] = ("p2-ok", [])
+    kwargs = {
+        "settings": Settings(gcp_project_id="phase2-sync"),
+        "corpus": KnowledgeCorpus(FakeEmbeddingBackend(8)),
+        "question": "hybrid?",
+    }
+
+    with patch("asyncio.run", return_value=sentinel) as mocked:
+        out = run_phase2_external_turn_sync(**kwargs)
 
     mocked.assert_called_once()
     assert out == sentinel
