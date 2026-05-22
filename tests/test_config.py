@@ -83,9 +83,12 @@ def test_news_agent_a2a_host_resolution_hint_blank_url():
 
 
 def test_news_agent_a2a_host_resolution_hint_localhost_ok():
-    assert news_agent_a2a_url_host_resolution_hint(
-        Settings(news_agent_a2a_base_url="http://localhost:8090/")
-    ) is None
+    assert (
+        news_agent_a2a_url_host_resolution_hint(
+            Settings(news_agent_a2a_base_url="http://localhost:8090/")
+        )
+        is None
+    )
 
 
 def test_news_agent_a2a_host_resolution_warns_compose_dns_on_host(
